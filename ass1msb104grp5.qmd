@@ -32,6 +32,17 @@ library(dineq)
 ```
 
 
+# Del A: Data og deskriptiv statistikk
+
+## Datakilder og Metadata 
+Vi analyserer perioden **2000-2023** for **Spania (ES), Østerrike (AT), Tsjekkia (CZ), Slovenia (SI)** og **Estland (EE)** på **NUTS-3**-nivå. Data ble lastet ned fra Eurostat som tilpassede "Spreadsheet CSV"-filer den **28.10.25**. Vi beregner **BNP per innbygger (GDPC)** som BNP i euro delt på totalt innbyggertall. Eventuelle datamerker/"flagg" (f.eks. *p* for foreløpig) beholdes som referanse, mens elve beregningen bruker tallverdiene.
+
+### BNP (nama_10r_3gdp)
+Regionalt BNP hentes fra **`nama_10r_3gdp`** med **`na_item = B1GQ`** (BNP i markedspriser) og **`unit = MIO_EUR`** (millioner euro). Tallene er årlige og rapporteres på NUTS-3. Eurostat fordeler nasjonale skatter/subsidier på produkter til regioner i tråd med metodikken i regionale nasjonalregnskaper. Aktivitet som ikke kan knyttes til en bestemt region håndteres som **extra-regio**. Serien kan inneholde **revisjoner** og mindre **brudd** (bl.a. oppdateringer i NUTS-klassifikasjon), så små sprang mellom år kan forekomme. 
+
+### Befolkning (demo_r_pjanaggr3)
+Befolning hentes fra **`demo_r_pjanaggr3`** med **`sex = T`** (totalt) og **`age = TOTAL`** (alle aldre). Populasjonsbegrepet er **vanlig bosted** (*ususal residence*) og referansetidspunktet er **1. januar** hvert år. Verdiene er oppgitt i **personer**. Kombinert med BNP-tabellen gir dette et konsistent grunnlag for å beregne **GDPC** på tvers av land og regioner i hele analyseperioden  
+
 
 
 
