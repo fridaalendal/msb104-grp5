@@ -1,0 +1,55 @@
+---
+title: "Assignment1 msb104 group5"
+author: Frida Alendal og Katinca Valvatne 
+lang: NO_nb
+editor: visual
+toc: true
+number-sections: true
+format:
+  html:
+    df-print: paged
+  pdf:
+    geometry: margin=2.5cm
+    keep-tex: false
+execute:
+  echo: true      # vis kode
+  warning: false  # skjul advarsler i output
+  message: false  # skjul meldinger i output
+---
+
+```{r}
+#| label: setup
+# Globale innstillinger og pakker
+knitr::opts_chunk$set(fig.align = "center", fig.width = 7, fig.height = 4.5, dpi = 300)
+
+# install.packages(c("tidyverse","janitor","eurostat","dineq")) # kjør én gang ved behov
+library(tidyverse)
+library(janitor)
+library(stringr)
+library(eurostat)
+library(dineq)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
