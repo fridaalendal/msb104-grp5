@@ -26,15 +26,34 @@ knitr::opts_chunk$set(fig.align = "center", fig.width = 7, fig.height = 4.5, dpi
 library(tidyverse)
 library(janitor)
 library(stringr)
-library(eurostat)
-library(dineq)
+```
+
+
+
+```{r}
+df1 <- read.csv("demo_r_pjanaggr3__custom_18648204_spreadsheet.csv", sep = ";")
+df2 <- read.csv("nama_10r_3gdp__custom_18648452_spreadsheet.csv", sep = ";")
+
+```
+
+```{r}
+
+str(df1)
+View(df1)
+
+```
+
+```{r}
+
+str(df2)
+View(df2)
 
 ```
 
 
-# Del A: Data og deskriptiv statistikk
+# Del A: Subnasjonalt BNP og BNP per innbygger
 
-## Datakilder og Metadata 
+## Data og deskriptiv statistikk 
 Vi analyserer perioden **2000-2023** for **Spania (ES), Østerrike (AT), Tsjekkia (CZ), Slovenia (SI)** og **Estland (EE)** på **NUTS-3**-nivå. Data ble lastet ned fra Eurostat som tilpassede "Spreadsheet CSV"-filer den **28.10.25**. Vi beregner **BNP per innbygger (GDPC)** som BNP i euro delt på totalt innbyggertall. Eventuelle datamerker/"flagg" (f.eks. *p* for foreløpig) beholdes som referanse, mens elve beregningen bruker tallverdiene.
 
 ### BNP (nama_10r_3gdp)
@@ -44,14 +63,97 @@ Regionalt BNP hentes fra **`nama_10r_3gdp`** med **`na_item = B1GQ`** (BNP i mar
 Befolning hentes fra **`demo_r_pjanaggr3`** med **`sex = T`** (totalt) og **`age = TOTAL`** (alle aldre). Populasjonsbegrepet er **vanlig bosted** (*ususal residence*) og referansetidspunktet er **1. januar** hvert år. Verdiene er oppgitt i **personer**. Kombinert med BNP-tabellen gir dette et konsistent grunnlag for å beregne **GDPC** på tvers av land og regioner i hele analyseperioden  
 
 
+## Beregning av BNP per innbygger (GDP per Capita Calculation)
 
 
 
+```{r}
+# laste inn datasett 1, BNP i millioner euro:
+
+df1 <- read_excel("nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx")
+
+# Legge til korrekt årstall og navn på variabler:
+
+names(df1) <- c("Geo_Kode", "Geo_Navn", 2000:2023)
+
+# Gjøre datasettet tidy:
+
+df1 <- df1 |> pivot_longer(col = c(3:26), names_to = "År", values_to = "BNP_mill_Euro")
+```
 
 
+```{r}
+library(readxl)
+library(tidyverse)
+library(janitor)
+
+# 1) Les inn nøyaktig filnavn, alt som TEKST
+df1 <- read_excel(
+  "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
+  col_types = "text"
+) |>
+  clean_names()
+
+# 2) Gi fornuftige navn til de to første kolonnene (kode/label).
+#    Hos deg ble det vist 'TIME...1' og 'TIME...2' – de er egentlig geo-kode og geo-navn.
+df1 <- df1 |>
+  rename(geo_kode = 1, geo_navn = 2)
+
+# 3) Gjør bredt → langt, og PARSE både år og verdier til tall
+df1 <- df1 |>
+  pivot_longer(
+    cols = 3:6,
+    names_to = "År",
+    values_to = "bnp_mill_eur"
+  ) |>
+  mutate(
+    År = readr::parse_number(År),                  # "2000" → 2000
+    bnp_mill_eur = readr::parse_number(bnp_mill_eur)  # "1 234,56" / ":" → 1234.56 / NA
+  )
+
+```
+
+```{r}
+# vis de første radene
+df1 |> dplyr::slice_head(n = 10)
+
+```
 
 
+```{r}
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(stringr)
 
+df1 <- read_excel(
+  "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
+  col_types = "text",
+  skip = 2              # <-- hopp over de to header-radene i Excel
+) |>
+  clean_names() |>
+  rename(geo_kode = 1, geo_navn = 2) |>
+  # fjern evt. rester av header-rader hvis de fortsatt sniker seg inn
+  filter(!str_detect(geo_kode, "^GEO")) |>
+  # gjør bredt -> langt: alle årskolonner til én kolonne
+  pivot_longer(
+    cols = -c(geo_kode, geo_navn),
+    names_to = "ar",
+    values_to = "bnp_mill_eur"
+  ) |>
+  mutate(
+    ar = readr::parse_number(ar),                 # "x2004" -> 2004
+    bnp_mill_eur = readr::parse_number(bnp_mill_eur)  # "23 859,75" -> 23859.75, ":" -> NA
+  )
+
+```
+
+
+```{r}
+df1 |> glimpse()
+df1 |> dplyr::slice_head(n = 10)
+
+```
 
 
 
