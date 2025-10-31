@@ -73,39 +73,6 @@ gdp_long <- BNP_MIO_Eur |>
 
 
 ```{r}
-# laste inn datasett 1, BNP i millioner euro:
-
-BNP_MIO_Eur <- read_excel("nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx")
-
-# gjør alle navn til tekst
-names(BNP_MIO_Eur) <- as.character(names(BNP_MIO_Eur))
-
-# Legge til korrekt årstall og navn på variabler:
-
-names(BNP_MIO_Eur) <- c("Geo_Kode", "Geo_Navn", 2000:2023)
-
-# Finn alle årskolonner trygt (2000–2023 kan være '2000' eller 'x2000' etter clean_names)
-year_cols <- grep("^x?\\d{4}$", names(BNP_MIO_Eur), value = TRUE)
-
-# ---- 2) Bred -> lang + "samme opprydding som Pop" ----
-BNP <- BNP_MIO_Eur %>%
-  # gi fornuftige navn på de to første kolonnene om nødvendig
-  rename(Geo_kode = 1, Geo_navn = 2) %>%
-  # fjern header-rader som ble lest som data (samme som Pop)
-  filter(!str_detect(Geo_kode, "^GEO"), Geo_navn != "GEO (Labels)") %>%
-  # gjør årskolonnene lange
-  pivot_longer(
-    cols = all_of(year_cols),
-    names_to  = "År",
-    values_to = "BNP_mill_Euro"
-  ) %>%
-  # sikre riktige typer (samme stil som Pop)
-  mutate(
-    År            = parse_number(År),            # "x2003"/"2003" -> 2003
-    BNP_mill_Euro = parse_number(BNP_mill_Euro)  # "23 859,75" / ":" -> 23859.75 / NA
-  )
-```
-```{r}
 # laste inn datasett 2, befolkning per 1. januar:
 
 Pop <- read_excel("demo_r_pjanaggr3__custom_18648204_spreadsheet_uten_flags.xlsx")
