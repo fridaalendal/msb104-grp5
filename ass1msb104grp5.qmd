@@ -70,15 +70,15 @@ Befolning hentes fra **`demo_r_pjanaggr3`** med **`sex = T`** (totalt) og **`age
 ```{r}
 # laste inn datasett 1, BNP i millioner euro:
 
-df1 <- read_excel("nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx")
+BNP_MIO_Eur <- read_excel("nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx")
 
 # Legge til korrekt årstall og navn på variabler:
 
-names(df1) <- c("Geo_Kode", "Geo_Navn", 2000:2023)
+names(BNP_MIO_Eur) <- c("Geo_Kode", "Geo_Navn", 2000:2023)
 
 # Gjøre datasettet tidy:
 
-df1 <- df1 |> pivot_longer(col = c(3:26), names_to = "År", values_to = "BNP_mill_Euro")
+BNP_MIO_Eur <- BNP_MIO_Eur |> pivot_longer(col = c(3:26), names_to = "År", values_to = "BNP_mill_Euro")
 ```
 
 
@@ -115,7 +115,7 @@ df1 <- df1 |>
 
 ```{r}
 # vis de første radene
-df1 |> dplyr::slice_head(n = 10)
+BNP_MIO_Eur |> dplyr::slice_head(n = 10)
 
 ```
 
@@ -155,6 +155,87 @@ df1 |> dplyr::slice_head(n = 10)
 
 ```
 
+```{r}
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(stringr)
+library(gt)
+
+## 1) BNP (millioner euro) → langt format
+gdp <- read_excel(
+  "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
+  col_types = "text",
+  skip = 2               # hopper over Excel-overskrifter
+) |>
+  clean_names() |>
+  rename(geo_kode = 1, geo_navn = 2) |>
+  filter(!str_detect(geo_kode, "^GEO")) |>
+  pivot_longer(
+    cols = -c(geo_kode, geo_navn),
+    names_to = "ar",
+    values_to = "bnp_mill_eur"
+  ) |>
+  mutate(
+    ar = readr::parse_number(ar),
+    bnp_mill_eur = readr::parse_number(bnp_mill_eur)
+  )
+
+## 2) Befolkning → langt format
+pop <- read_excel(
+  "demo_r_pjanaggr3__custom_18648204_spreadsheet_uten_flags.xlsx",
+  col_types = "text",
+  skip = 2
+) |>
+  clean_names() |>
+  rename(geo_kode = 1, geo_navn = 2) |>
+  filter(!str_detect(geo_kode, "^GEO")) |>
+  pivot_longer(
+    cols = -c(geo_kode, geo_navn),
+    names_to = "ar",
+    values_to = "befolkning"
+  ) |>
+  mutate(
+    ar = readr::parse_number(ar),
+    befolkning = readr::parse_number(befolkning)
+  )
+
+## 3) Join på region + år og beregn GDPC
+dat <- left_join(
+  gdp |> select(geo_kode, geo_navn, ar, bnp_mill_eur),
+  pop |> select(geo_kode, ar, befolkning),
+  by = join_by(geo_kode, ar)
+) |>
+  mutate(
+    gdpc_eur = (bnp_mill_eur * 1e6) / befolkning
+  ) |>
+  # behold kun 2000–2023, og kast rader uten tall
+  filter(between(ar, 2000, 2023), !is.na(gdpc_eur))
+
+## 4) Vis som tabell (hele paneuropeiske NUTS-3 kan være stor – vis noen rader)
+dat |> slice_head(n = 20) |> gt()
+
+## 5) Hvis du vil ha ALT samlet til analyse/figur senere:
+# - sortér pent
+gdpc_all <- dat |>
+  arrange(geo_kode, ar)
+
+## 6) Valgfritt: lag en 2023-oversikt for dine land (ES, AT, CZ, SI, EE)
+oversikt_2023 <- gdpc_all |>
+  filter(ar == 2023, str_detect(geo_kode, "^(ES|AT|CZ|SI|EE)")) |>
+  transmute(
+    geo_kode, geo_navn, ar,
+    BNP_mrd_EUR = round(bnp_mill_eur / 1000, 2),
+    GDPC_EUR = round(gdpc_eur, 0)
+  ) |>
+  arrange(desc(GDPC_EUR))
+
+oversikt_2023 |> gt()
+
+## 7) Eksporter hele datasettet hvis ønskelig
+# write_csv(gdpc_all, "gdpc_all_regions_2000_2023.csv")
+
+```
 
 
 
