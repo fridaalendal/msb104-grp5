@@ -13,8 +13,8 @@ format:
     keep-tex: false
 execute:
   echo: true      # vis kode
-  warning: false  # skjul advarsler i output
-  message: false  # skjul meldinger i output
+  warning: true  # skjul advarsler i output
+  message: true  # skjul meldinger i output
 ---
 
 ```{r}
@@ -46,29 +46,56 @@ Befolning hentes fra **`demo_r_pjanaggr3`** med **`sex = T`** (totalt) og **`age
 
 ```{r}
 # 1) Les inn på nytt – ALT som tekst, hopp over header-rader
-BNP_MIO_Eur <- read_excel(
-  "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
-  col_types = "text",
-  skip = 2
-) |>
-  clean_names() |>
-  rename(
-    geo_kode = 1,   # dette er TIME...1 i arket ditt
-    geo_navn = 2    # dette er TIME...2
+gdp <- readxl::read_excel(path = "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
+  sheet = 'Sheet 1'
   )
-# 2) Gjør bredt -> langt og parse til tall
-gdp_long <- BNP_MIO_Eur |>
-  filter(!str_detect(geo_kode, "^GEO")) |>     # fjern evt. "GEO (Codes)"-rader
-  pivot_longer(
-    cols = -c(geo_kode, geo_navn),             # ALLE årskolonner
-    names_to  = "ar",
-    values_to = "gdp_mio_eur"
-  ) |>
+  
+```
+
+```{r}
+#| paged.print: false
+head(gdp)
+```
+
+```{r}
+# Fikser litt
+names(gdp)[1] <- "geo_codes"
+names(gdp)[2] <- "geo_names"
+# dropper første rekken
+gdp <- gdp[-1,]
+# Fikser år 2023 som er character
+gdp <- gdp |> 
   mutate(
-    ar          = readr::parse_number(ar),         # "2003" -> 2003
-    gdp_mio_eur = readr::parse_number(gdp_mio_eur) # "23 859,75"/":" -> 23859.75/NA
+    `2023` = as.numeric(`2023`)
   )
 ```
+
+```{r}
+gdp_long <- gdp |> 
+  pivot_longer(
+    cols = `2000`:`2023`,
+    names_to = "Year",
+    values_to = "gdp"
+  )
+```
+
+```{r}
+#Lager NUTS2, NUTS1 og NUTSc (Country) variabler
+
+gdp_long <- gdp_long |> 
+  mutate(
+    NUTS2 = str_sub(geo_codes, start = 1L, end = 4L),
+    NUTS1 = str_sub(geo_codes, start = 1L, end = 3L),
+    NUTSc = str_sub(geo_codes, start = 1L, end = 2L)
+  )
+
+```
+
+
+
+
+
+
 
 
 
@@ -103,7 +130,7 @@ Pop <- Pop %>%
 
 ```{r}
 # vis de første radene
-BNP_MIO_Eur |> dplyr::slice_head(n = 10)
+gdp |> dplyr::slice_head(n = 10)
 
 ```
 
