@@ -77,7 +77,9 @@ gdp_long <- gdp |>
     names_to = "Year",
     values_to = "gdp"
   )
+
 ```
+
 
 ```{r}
 #Lager NUTS2, NUTS1 og NUTSc (Country) variabler
@@ -138,7 +140,6 @@ gdp |> dplyr::slice_head(n = 10)
 # Viser de første radene
 Pop |> dplyr::slice_head(n = 10)
 ```
-
 
 
 
