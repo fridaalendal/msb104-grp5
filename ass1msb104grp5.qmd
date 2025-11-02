@@ -13,9 +13,41 @@ format:
     keep-tex: false
 execute:
   echo: true      # vis kode
+  # ag: vil anbefale å ha disse på mens dere utvikler
+  # kan slås av for endelig rapport
   warning: true  # skjul advarsler i output
   message: true  # skjul meldinger i output
 ---
+
+# Del A: Subnasjonalt BNP og BNP per innbygger
+
+## Data og deskriptiv statistikk
+
+Vi analyserer perioden **2000-2023** for **Spania (ES), Østerrike (AT), Tsjekkia (CZ), Slovenia (SI)** og **Estland (EE)** på **NUTS-3**-nivå.
+Data ble lastet ned fra Eurostat som tilpassede "Spreadsheet CSV"-filer den **28.10.25**.
+Vi beregner **BNP per innbygger (GDPC)** som BNP i euro delt på totalt innbyggertall.
+Eventuelle datamerker/"flagg" (f.eks. *p* for foreløpig) beholdes som referanse, mens elve beregningen bruker tallverdiene.
+
+### BNP (nama_10r_3gdp)
+
+Regionalt BNP hentes fra **`nama_10r_3gdp`** med **`na_item = B1GQ`** (BNP i markedspriser) og **`unit = MIO_EUR`** (millioner euro).
+Tallene er årlige og rapporteres på NUTS-3.
+Eurostat fordeler nasjonale skatter/subsidier på produkter til regioner i tråd med metodikken i regionale nasjonalregnskaper.
+Aktivitet som ikke kan knyttes til en bestemt region håndteres som **extra-regio**.
+Serien kan inneholde **revisjoner** og mindre **brudd** (bl.a. oppdateringer i NUTS-klassifikasjon), så små sprang mellom år kan forekomme.
+
+### Befolkning (demo_r_pjanaggr3)
+
+Befolning hentes fra **`demo_r_pjanaggr3`** med **`sex = T`** (totalt) og **`age = TOTAL`** (alle aldre).
+Populasjonsbegrepet er **vanlig bosted** (*ususal residence*) og referansetidspunktet er **1. januar** hvert år.
+Verdiene er oppgitt i **personer**.
+Kombinert med BNP-tabellen gir dette et konsistent grunnlag for å beregne **GDPC** på tvers av land og regioner i hele analyseperioden
+
+
+
+## Beregning av BNP per innbygger (GDP per Capita Calculation)
+
+
 
 ```{r}
 #| label: setup
@@ -29,33 +61,25 @@ library(stringr)
 ```
 
 
-# Del A: Subnasjonalt BNP og BNP per innbygger
-
-## Data og deskriptiv statistikk 
-Vi analyserer perioden **2000-2023** for **Spania (ES), Østerrike (AT), Tsjekkia (CZ), Slovenia (SI)** og **Estland (EE)** på **NUTS-3**-nivå. Data ble lastet ned fra Eurostat som tilpassede "Spreadsheet CSV"-filer den **28.10.25**. Vi beregner **BNP per innbygger (GDPC)** som BNP i euro delt på totalt innbyggertall. Eventuelle datamerker/"flagg" (f.eks. *p* for foreløpig) beholdes som referanse, mens elve beregningen bruker tallverdiene.
-
-### BNP (nama_10r_3gdp)
-Regionalt BNP hentes fra **`nama_10r_3gdp`** med **`na_item = B1GQ`** (BNP i markedspriser) og **`unit = MIO_EUR`** (millioner euro). Tallene er årlige og rapporteres på NUTS-3. Eurostat fordeler nasjonale skatter/subsidier på produkter til regioner i tråd med metodikken i regionale nasjonalregnskaper. Aktivitet som ikke kan knyttes til en bestemt region håndteres som **extra-regio**. Serien kan inneholde **revisjoner** og mindre **brudd** (bl.a. oppdateringer i NUTS-klassifikasjon), så små sprang mellom år kan forekomme. 
-
-### Befolkning (demo_r_pjanaggr3)
-Befolning hentes fra **`demo_r_pjanaggr3`** med **`sex = T`** (totalt) og **`age = TOTAL`** (alle aldre). Populasjonsbegrepet er **vanlig bosted** (*ususal residence*) og referansetidspunktet er **1. januar** hvert år. Verdiene er oppgitt i **personer**. Kombinert med BNP-tabellen gir dette et konsistent grunnlag for å beregne **GDPC** på tvers av land og regioner i hele analyseperioden  
-
-
-## Beregning av BNP per innbygger (GDP per Capita Calculation)
-
-
 ```{r}
-# 1) Les inn på nytt – ALT som tekst, hopp over header-rader
-gdp <- readxl::read_excel(path = "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
+# Lastet ned data og bytter navn til gdp: 
+
+#df1 <- read.csv("demo_r_pjanaggr3__custom_18648204_spreadsheet.csv", sep = ";")
+#df2 <- read.csv("nama_10r_3gdp__custom_18648452_spreadsheet.csv", sep = ";")
+# Kaller den heller for gdp
+gdp <- readxl::read_xlsx(
+  path = "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
   sheet = 'Sheet 1'
   )
-  
 ```
+
 
 ```{r}
 #| paged.print: false
 head(gdp)
 ```
+
+
 
 ```{r}
 # Fikser litt
@@ -71,13 +95,24 @@ gdp <- gdp |>
 ```
 
 ```{r}
-gdp_long <- gdp |> 
-  pivot_longer(
-    cols = `2000`:`2023`,
-    names_to = "Year",
-    values_to = "gdp"
+# 1) Les inn på nytt – ALT som tekst, hopp over header-rader
+gdp <- readxl::read_excel(path = "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
+  sheet = 'Sheet 1'
   )
+  
+```
 
+
+```{r}
+gdp_long <- gdp |>
+  filter(!str_detect(TIME...1, "^GEO"), TIME...2 != "GEO (Labels)") |>
+  mutate(across(all_of(year_cols), readr::parse_number)) |>
+  pivot_longer(
+    cols = (4),
+    names_to = "år",
+    values_to = "gdp",
+    names_transform = list(år = ~ as.integer(str_remove(.x, "^x")))
+  )
 ```
 
 
@@ -96,50 +131,435 @@ gdp_long <- gdp_long |>
 
 
 
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(readr)
+library(janitor)
 
+# 1) Les inn på nytt slik at vi får den brede tabellen igjen
+Pop <- read_excel(
+  "demo_r_pjanaggr3__custom_18648204_spreadsheet_uten_flags.xlsx",
+  col_types = "text"
+) |>
+  clean_names() |>
+  rename(geo_kode = 1, geo_navn = 2)
+
+# 2) Finn år-kolonner robust (tåler både '2000' og 'x2000')
+year_cols <- names(Pop)[str_detect(names(Pop), "^\\d{4}$|^x\\d{4}$")]
+
+# 3) Gjør alle år-kolonner til tall og smelt langt
+Pop_long <- Pop |>
+  filter(!str_detect(geo_kode, "^GEO"), geo_navn != "GEO (Labels)") |>
+  mutate(across(all_of(year_cols), readr::parse_number)) |>
+  pivot_longer(
+    cols = all_of(year_cols),
+    names_to = "år",
+    values_to = "befolkning",
+    names_transform = list(år = ~ as.integer(str_remove(.x, "^x")))
+  )
+
+# Sjekk
+Pop_long |>
+  slice_head(n = 10)
+
+```
 
 
 
 
 ```{r}
-# laste inn datasett 2, befolkning per 1. januar:
-
-Pop <- read_excel("demo_r_pjanaggr3__custom_18648204_spreadsheet_uten_flags.xlsx")
-
-# legge til korrekt årstall og navn på variabler:
-
-names(Pop) <- c("Geo_kode", "Geo_navn", 2000:2023)
-
-# Gjøre datasettet tidy:
-
-Pop <- Pop |> pivot_longer(col = c(3:26), names_to = "År", values_to = "Befolkning")
-
 library(dplyr)
 library(stringr)
 library(readr)
+library(tidyr)
 
+# 1) Finn år-kolonner
+year_cols <- intersect(names(Pop), as.character(2000:2023))
+
+# 2) Rydd bort GEO-rader (hvis ikke gjort)
 Pop <- Pop %>%
-  # fjern header-radene som ble lest som data
-  filter(!str_detect(Geo_kode, "^GEO"), Geo_navn != "GEO (Labels)") %>%
-  # sikre typer
+  filter(!str_detect(geo_kode, "^GEO (Codes)"), geo_navn != "GEO (Labels)")
+
+# 3) Gjør ALLE år-kolonner til numeric, robust for både character og double
+Pop <- Pop %>%
   mutate(
-    År = as.integer(År),
-    Befolkning = parse_number(Befolkning)  # "1 234 567" / ":" -> 1234567 / NA
+    across(
+      all_of(year_cols),
+      ~ readr::parse_number(
+          as.character(.),                     # tving til tekst først
+          locale = readr::locale(
+            decimal_mark   = ",",              # 23 859,75
+            grouping_mark  = " "               # tusenskilletegn
+          )
+        )
+    )
   )
 
 ```
 
 
+RIKTIG!! BEHOLD
 ```{r}
 # vis de første radene
 gdp |> dplyr::slice_head(n = 10)
 
 ```
 
+RIKTIG!! BEHOLD
 ```{r}
 # Viser de første radene
 Pop |> dplyr::slice_head(n = 10)
 ```
+
+
+RIKTIG!! BEHOLD
+```{r}
+gdp_long |> dplyr::slice_head(n = 10)
+Pop_long |> dplyr::slice_head(n = 10)
+
+
+```
+
+
+
+
+```{r}
+library(dplyr)
+library(readr)  # for parse_number if du trenger det
+
+# 1) Standardiser kolonnenavn og typer -------------------------
+# Anta at du har:
+#   gdp_long:  geo_kode, geo_navn, år, gdp_mio_eur  (dbl)
+#   Pop_long:  geo_kode, geo_navn, år, befolkning   (dbl)
+
+gdp <- gdp_long %>%
+  rename(geo = geo_codes, geo_name = geo_names, year = year, gdp_mio_eur = gdp) %>%
+  mutate(year = as.integer(year))
+
+pop <- Pop_long %>%
+  rename(geo = geo_kode, geo_name = geo_navn, year = år, pop = befolkning) %>%
+  mutate(year = as.integer(year))
+
+# 2) Slå sammen med left_join ---------------------------------
+gdp_pop <- gdp %>%
+  left_join(pop %>% select(geo, year, pop), by = join_by(geo, year))
+
+# 3) Regn ut BNP per innbygger --------------------------------
+# NB: gdp_mio_eur er i millioner euro, så gang med 1e6 før du deler.
+gdp_pop <- gdp_pop %>%
+  mutate(
+    gdpc_eur = (gdp_mio_eur * 1e6) / pop,     # euro per innbygger
+    gdpc_thousand = gdpc_eur / 1000           # tusen euro (ofte penere tall)
+  )
+
+# Kjapp sanity check
+gdp_pop %>% slice_head(n = 10)
+
+# Valgfritt: 2023-oversikt for dine land (ES, AT, CZ, SI, EE)
+oversikt_2023 <- gdp_pop %>%
+  filter(year == 2023, grepl("^(ES|AT|CZ|SI|EE)", geo)) %>%
+  arrange(desc(gdpc_eur)) %>%
+  select(geo, geo_name, year, gdp_mio_eur, pop, gdpc_eur)
+
+oversikt_2023 %>% slice_head(n = 10)
+
+```
+
+
+
+
+
+## Beskrivende analyse
+
+### Datagrunnlag og definisjoner
+
+Vi analyserer BNP per innbygger (GDPC) på NUTS-3-nivå for Østerrike (AT), Tsjekkia (CZ), Estland (EE), Spania (ES) og Slovenia (SI) i perioden 2000-2023. GDPC er beregnet som regionalt BNP i millioner euro delt på regional befolkning per 1. januar, og deretter omregnet til euro per person. Tallene er i løpende euro (ikke prisjustert og ikke i PPS), så sammenlikninger over tid og på tvers av land kan påvirkes av prisnivå og valutakurser. Datagrunnlaget kommer fra Eurostat (nama_10r_3gdp og demo_r_pjanaggr3).
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+land <- c("ES","AT","CZ","SI","EE")
+
+gdpc <- gdp_pop %>%
+  mutate(country = substr(geo, 1, 2)) %>%
+  filter(country %in% land)
+
+```
+
+
+```{r}
+stats_land_all <- gdpc %>%
+  group_by(country) %>%
+  summarise(
+    n_obs   = n(),
+    mean    = mean(gdpc_eur, na.rm = TRUE),
+    sd      = sd(gdpc_eur, na.rm = TRUE),
+    q1      = quantile(gdpc_eur, 0.25, na.rm = TRUE),
+    median  = median(gdpc_eur, na.rm = TRUE),
+    q3      = quantile(gdpc_eur, 0.75, na.rm = TRUE),
+    min     = min(gdpc_eur, na.rm = TRUE),
+    max     = max(gdpc_eur, na.rm = TRUE),
+    cv      = sd/mean  # variasjonskoeffisient
+  )
+stats_land_all
+
+```
+
+Tabellen viser fordelingen av BNP per innbygger (GDPC, EUR) på NUTS-3-nivå for fem land, med antall observasjoner, gjennomsnitt, standardavvik, kvartiler (Q1–median–Q3), min/maks og variasjonskoeffisient (sd/mean).
+
+Østerrike (AT) ligger klart høyest i nivå (gj.sn. 32 700; median 31 600; Q1–Q3 ≈ 25 000–39 800). Spredningen er stor (sd ≈ 9 900, CV ≈ 0,30), noe som peker mot betydelige forskjeller mellom rike byregioner og mer perifere områder.
+Spania (ES) har nest høyest nivå (gj.sn. 21 000, median 20 000) og den laveste relative spredningen (sd ≈ 5 000, CV ≈ 0,24). Med 1 440 region–år-observasjoner er mønsteret også mest stabilt.
+Slovenia (SI) ligger midt på treet (gj.sn. 16 800, median 15 800; CV ≈ 0,33) med moderat spredning.
+Tsjekkia (CZ) (14 800, median 12 900) og Estland (EE) (13 700, median 11 900) har lavere nivåer og klart høyere relative forskjeller (CV ≈ 0,54–0,57). Det at gjennomsnittet ligger over medianen i flere land tyder på høyreskjeve fordelinger – noen få svært produktive regioner (typisk hovedstadsområder) løfter snittet og maksverdiene.
+
+Kort sagt: AT høyt nivå og stor ulikhet, ES jevnere fordeling, SI middels, mens CZ/EE har lavere nivå og størst relativ spredning.
+
+
+
+```{r}
+gdpc_2023 <- gdpc %>% filter(year == 2023)
+
+stats_land_2023 <- gdpc_2023 %>%
+  group_by(country) %>%
+  summarise(
+    n_regions = n(),
+    mean = mean(gdpc_eur, na.rm = TRUE),
+    sd   = sd(gdpc_eur, na.rm = TRUE),
+    min  = min(gdpc_eur, na.rm = TRUE),
+    max  = max(gdpc_eur, na.rm = TRUE)
+  )
+
+topp10_2023 <- gdpc_2023 %>%
+  arrange(desc(gdpc_eur)) %>%
+  select(geo, geo_name, country, gdpc_eur) %>%
+  slice_head(n = 10)
+
+bunn10_2023 <- gdpc_2023 %>%
+  arrange(gdpc_eur) %>%
+  select(geo, geo_name, country, gdpc_eur) %>%
+  slice_head(n = 10)
+
+stats_land_2023
+topp10_2023
+bunn10_2023
+
+```
+
+
+
+### Tidsutvikling (lands-gjennomsnitt 2000-2023)
+
+```{r}
+# Tidsutvikling av landsgjennomsnitt (2000–2023)
+
+gdpc_country_mean <- gdpc %>%
+  group_by(country, year) %>%
+  summarise(mean_gdpc = mean(gdpc_eur, na.rm = TRUE), .groups = "drop")
+
+library(ggplot2)
+
+ggplot(gdpc_country_mean,
+       aes(x = year, y = mean_gdpc, color = country, group = country)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 1.8) +
+  labs(x = "År", y = "BNP per innbygger (EUR)",
+       title = "Landsgjennomsnitt GDPC (NUTS-3)") +
+  theme_minimal()
+
+```
+
+Linjeplottet med landsgjennomsnitt (NUTS-3 snitt innen hvert land) viser et tydelig mønster.
+
+Alle land har stigende GDPC over tid. AT ligger høyest gjennom hele perioden, mens EE og SI viser tydelig innhenting. CZ og ES vokser jevnt. Eventuelle "knekkpunkt" rundt 2008-2009 samsvarer med finanskrisen før vekstbanen fortsetter. 
+
+Bildet er konsistent med økonomisk innhenting i Sentral- og Øst-Europa, samtidig som AT holder et stabilt høyere nivå.
+
+
+
+### Spredning internt i land - 2023
+
+```{r}
+# Spredning per land i 2023 (boksplott på regionnivå)
+
+ggplot(gdpc_2023, aes(country, gdpc_eur)) +
+  geom_boxplot() +
+  labs(x = "Land", y = "BNP per innbygger (EUR)", title = "Spredning i GDPC på NUTS-3, 2023")
+
+```
+
+Boksskjemaet for 2023 (GDPC på NUTS-3 innen hvert land) viser at forskjellene mellom regioner varierer på tvers av land. SI har en relativt høy median og tydelig spredning, mens noen regioner trekker opp. CZ har moderat spredning, men ett tydelig høyt punkt som ligger godt over resten. EE har lavere median enn CZ og SI, og litt smalere spredning.
+
+
+### Fordeling for ett land - Tsjekkia
+
+
+```{r}
+# Fordeling for ett land (Tsjekkia) – fast farge
+ggplot(
+  filter(gdpc_2023, country == "CZ"),       # filtrer til Tsjekkia
+  aes(gdpc_eur)                             # x-variabel: BNPI per innbygger (EUR)
+) +
+  geom_histogram(
+    bins = 20,                              # antall «bøtter»
+    color = "white",                        # kantfarge på stolpene
+    fill  = "#4E79A7"                       # fyllfarge (velg hvilken som helst hex/navn)
+  ) +
+  labs(
+    x = "BNP per innbygger (EUR)",
+    title = "Fordeling av GDPC – Tsjekkia, 2023"
+  ) +
+  theme_minimal()
+
+```
+
+Histogrammet for Tsjekkia 2023 viser en høyreskjev fordeling. De fleste regioner ligger samlet i et bånd rundt 20-30 000 euro per innbygger, mens Praha er et tydelig høyt punkt som trekker maksimum opp.
+
+### konklusjon
+
+Østerrike ligger høyest i GDPC gjennom hele perioden, mens Slovenia tar mest innpå. Tsjekkia og Estland har lavere nivå men større relativ spredning mellom regioner (høy CV), noe som tyder på sterk hovedstads-/kjerneeffekt. Spania er jevnere med moderat spredning. Samlet peker mønstrene på både økonomisk vekst og økende konvergens, men uten prisjustering/PPP må nivåforskjeller tolkes varsomt.
+
+
+
+
+# Del B 
+
+## Litteraturoversikt
+
+Artikkelen bygger et globalt datasett for regional inntektsulikhet ved å predikere regionale inntekter fra nattlys-satellittdata, og bruker disse til å beregne standard mål som befolkningsvektet Gini og generaliserte entropi-mål. Poenget er at lysintensitet henger stabilt sammen med regional økonomisk aktivitet, og at predikert inntekt (korrigert for målefeil som «top-coding» og «zero-coding») fanger reelle (ikke bare nominelle) forskjeller bedre enn lys alene.
+
+De finner at om lag 67–70 % av landene opplever sigma-konvergens (fallende spredning mellom regioner) over tid, men at en ikke-triviell andel har økende ulikhet. Samtidig estimeres et N-formet (Kuznets-liknende) forhold mellom utviklingsnivå og regional ulikhet: svært fattige land får økende ulikhet i starten, mellominntektsland ser fallende ulikhet, mens de aller rikeste kan ha en svak ny økning.
+
+I panelanalyser finner de at naturressurser, handelsåpenhet, transportkostnader, bistand og etnisk ulikhet henger positivt sammen med regional ulikhet, mens dyrkbar mark-andel, føderalisme og humankapital (utdanning) henger negativt sammen. Praktisk for vår oppgave er også begrunnelsen for befolkningsvekting: når regioner har svært ulik størrelse/befolkning, må ulikhetsmål gi små regioner lavere vekt for å si noe meningsfullt om «inter-gruppe» ulikhet innen landet.
+
+
+## Beregning: Gini (befolkningsvektet) for NUTS-2 per år
+
+Vi beregner befolkningsvektede Gini-koeffisienter for GDPC på NUTS-2 ved å bruke NUTS-3 som fordelingsenheter innen hver region og år. Dette gir et mål på regional ulikhet innad i NUTS-2, ikke mellom land, og lar oss studere hvordan intern skjevhet utvikler seg over tid.
+
+```{r}
+# Pakker
+library(dplyr)
+library(stringr)
+library(dineq)     # gini.wtd(x, weights = ...)
+
+# 0) Sørg for kodekolonner
+gdpc <- gdpc %>%
+  mutate(
+    NUTS2 = str_sub(geo, 1, 4),      # NUTS-2 fra NUTS-3 koden
+    NUTS1 = str_sub(geo, 1, 3)
+  )
+
+# 1) Kvalitetsfilter (valgfritt, men lurt):
+#    - gyldige tall for gdpc_eur og pop
+#    - minst 3 NUTS-3-enheter per (country, NUTS2, year)
+gdpc_clean <- gdpc %>%
+  filter(is.finite(gdpc_eur), is.finite(pop), pop > 0) %>%
+  group_by(country, NUTS2, year) %>%
+  filter(dplyr::n() >= 3) %>%
+  ungroup()
+
+# 2) Gini pr (land, NUTS2, år) – befolkningsvektet
+gini_nuts2_year <- gdpc_clean %>%
+  group_by(country, NUTS2, year) %>%
+  summarise(
+    n_nuts3 = dplyr::n(),
+    mean_y  = weighted.mean(gdpc_eur, w = pop, na.rm = TRUE),
+    gini_w  = gini.wtd(gdpc_eur, weights = pop),   # befolkningsvektet Gini
+    .groups = "drop"
+  )
+
+# 3) Lag også 2023-snitt og ev. rangeringer (nyttig til tabeller/figurer)
+gini_2023 <- gini_nuts2_year %>%
+  filter(year == 2023) %>%
+  arrange(country, desc(gini_w))
+
+gini_nuts2_year |> dplyr::slice_head(n = 10)
+```
+
+I tabellen viser hver rad én NUTS-2-region per år, med antall NUTS-3-enheter (n_nuts3), befolkningsvektet gjennomsnittlit BNP per innbygger (mean_y, EUR) og befolningsvektet Gini-koefiisient (gini_w). Gini måler ulikhet i GDPC mellom NUTS-3 inni regionen (0 = helt jevnt; høyere = større forskjeller). Eksempelvis øker AT11 sin mean_y fra ~18,2 til ~23,5 tusen EUR i 2001-2010, samtidig som gini_w stiger fra 0,025 til 0,047, som tyder på økende interne forskjeller i regionen. Beregningene er gjort på gyldige (endelige) tall med befolkningsvekter, og rader med færre enn tre NUTS-3-enheter er filtrert bort for robusthet. 
+
+
+
+## Befolkningsvektet Gini for BNP per innbygger (GDPC) på NUTS-2
+
+Tabellen nedenfor viser en oppsummering per land, og i løpet av alle årene. Tabellen viser antall observasjoner (n_obs), gjennomsnitt (mean), median, standardavvik (sd) og kvartiler (q1-q3) for den årlige, befolkningsvektede Gini-koeffisient beregnet innen hver NUTS-2 (ulikhet mellom underliggende NUTs-3-regioner). Høyere Gini indikerer større interne forksjeller i GPDC.
+
+
+```{r}
+# Sammendrag per land over hele perioden
+gini_summary_country <- gini_nuts2_year %>%
+  group_by(country) %>%
+  summarise(
+    n_obs   = dplyr::n(),
+    mean    = mean(gini_w, na.rm = TRUE),
+    median  = median(gini_w, na.rm = TRUE),
+    sd      = sd(gini_w, na.rm = TRUE),
+    q1      = quantile(gini_w, 0.25, na.rm = TRUE),
+    q3      = quantile(gini_w, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+gini_summary_country
+
+```
+
+Funnene våre viser et tydelig mønster i regional ulikhet målt med befolkningsvektet Gini. Estland (EE) skiller seg ut med klart høyest intern ulikhet (gjennomsnitt ~0,172) og et relativt stabilt nivå over tid (sd ~0,013; IQR ~0,161–0,183). Østeriket (AT) og Slovenia (SI) ligger på et middels-høyt nivå (AT ~0,096; SI ~0,093), men med mer markert tidsvariasjon (AT sd ~0,041; SI sd ~0,024), som antyder perioder med både økende og avtakende regional skjevhet. Spania (ES) og Tsjekkia (CZ) har derimot lav intern ulikhet (ES ~0,033; CZ ~0,024) og smal kvartilbredde, noe som peker mot jevnere fordeling mellom NUTS-3-regioner.
+
+
+## Tidsutvikling i regional ulikhet
+
+Figurene under viser tidsutviklingen i regional ulikhet målt som befolkningsvektet Gini-koeffisient for NUTS-3 innen hver NUTS-2 i de fem landene vi har observert i perioden 2000-2023. Hver liten rute er ett land, og hver linje er en NUTS-2-region i det landet. Merk at y-aksen har egen skala per land (free_y), så nivåer kan ikke sammenlignes direkte på tvers av land. Vi leser først og fremst trender og spredning.
+
+
+```{r}
+library(ggplot2)
+
+ggplot(gini_nuts2_year,
+       aes(x = year, y = gini_w, group = NUTS2, color = country)) +
+  geom_line(linewidth = 0.9, alpha = 0.8) +
+  geom_point(size = 1.6) +
+  facet_wrap(~ country, ncol = 2, scales = "free_y") +
+  labs(
+    x = "År",
+    y = "Gini (NUTS-2, vektet)",
+    title = "Tidsutvikling i regional ulikhet (Gini) innen NUTS-2 (NUTS-3 som enheter)"
+  ) +
+  theme_minimal()
+
+```
+
+
+Mønstrene varierer tydelig. Østeriket (AT) starter høyt og faller svakt over tid,som tyder på gradvis konvergens, men ulikheten forblir relativt høy. Tsjekkia (CZ) går motsatt vei, fra lavt nivå rundt 2000 til en jevn økning i flere NUTS-2-regioner, altså økende regional divergens. Estland (EE) ligger høyt hele perioden, med et tydelig fall rundt 2008-2012 og ny oppgang de siste årene, et syklisk mønster. Spania (ES) har lav-moderat og stabil ulikhet; linjene ligger tett og beveger seg lite, noe som peker mot en jevn fordeling mellom regioner. Slovenia (SI) ligger midt imellom, med nedgang gjennom 2010-tallet og et nylig oppsving i enkelte regioner. Samlet bekrefter dette at landene har ulike dynamikker: EE og til dels AT/SI viser mer variasjon over tid, mens ES er stabilt lavt og CZ er klart stigende. 
+
+
+
+## Rangering 2023, "topp 10" og "bunn 10" NUTS-2 (befolkningsvektet Gini)
+
+Tabellen rangerer NUTS-2-regioner i 2023 etter befolkningsvektet Gini for BNP per innbygger (høyere = mer ulikhet mellom NUTS-3 i samme NUTS-2). Kolonnen "n_nuts3" viser hvor mange NUTS-3 som inngår i beregningen. Dette sier noe om hvor robust målet er (få underenheter --> mer følsomt).
+
+```{r}
+topp10_gini_2023 <- gini_2023 %>%
+  arrange(desc(gini_w)) %>%
+  slice_head(n = 10)
+
+bunn10_gini_2023 <- gini_2023 %>%
+  arrange(gini_w) %>%
+  slice_head(n = 10)
+
+topp10_gini_2023
+bunn10_gini_2023
+
+```
+
+
+Rangeringen bekrefter hovedmønstrene vi har sett i tidsseriene. EE00 ligger helt i toppen i 2023 (Gini ≈ 0,16), noe som peker på markert intern ulikhet mellom etiske NUTS-3. Også SI04 fremstår som relativt ulik (Gini ≈ 0,12), mens andre slovenske NUTS-2, som SI03, ligger mer moderat (Gini ≈ 0,06). I den andre enden finner vi CZ05 med lav ulikhet (Gini ≈ 0,04). Samlet tyder dette på at Estland fortsatt er mest polarisert, Slovenia er mellomnivå men heterogent på tvers av NUTS-2, mens tsjekkiske regioner ligger stabilt lavt. Merk at vurderingen bør ta hensyn til antall underregioner (n_nuts3). Få NUTS-3 kan gi mer volatile Gini-anslag.
+
+
+
 
 
 
