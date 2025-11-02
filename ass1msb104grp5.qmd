@@ -6,17 +6,19 @@ editor: visual
 toc: true
 number-sections: true
 format:
-  html:
-    df-print: paged
   pdf:
+    pdf-engine: xelatex
     geometry: margin=2.5cm
     keep-tex: false
 execute:
   echo: true      # vis kode
   # ag: vil anbefale å ha disse på mens dere utvikler
   # kan slås av for endelig rapport
-  warning: true  # skjul advarsler i output
-  message: true  # skjul meldinger i output
+  warning: false  # skjul advarsler i output
+  message: false  # skjul meldinger i output
+
+
+
 ---
 
 # Del A: Subnasjonalt BNP og BNP per innbygger
@@ -94,32 +96,25 @@ gdp <- gdp |>
   )
 ```
 
-```{r}
-# 1) Les inn på nytt – ALT som tekst, hopp over header-rader
-gdp <- readxl::read_excel(path = "nama_10r_3gdp__custom_18648452_spreadsheet_uten_flags.xlsx",
-  sheet = 'Sheet 1'
-  )
-  
-```
-
 
 ```{r}
-gdp_long <- gdp |>
-  filter(!str_detect(TIME...1, "^GEO"), TIME...2 != "GEO (Labels)") |>
-  mutate(across(all_of(year_cols), readr::parse_number)) |>
+# Gjør gdp land (tidy)
+gdp_long <- gdp |> 
   pivot_longer(
-    cols = (4),
-    names_to = "år",
-    values_to = "gdp",
-    names_transform = list(år = ~ as.integer(str_remove(.x, "^x")))
+    cols = `2000`:`2023`,
+    names_to = "Year",
+    values_to = "gdp"
   )
+
 ```
+
+
 
 
 ```{r}
 #Lager NUTS2, NUTS1 og NUTSc (Country) variabler
 
-gdp_long <- gdp_long |> 
+gdp <- gdp_long |> 
   mutate(
     NUTS2 = str_sub(geo_codes, start = 1L, end = 4L),
     NUTS1 = str_sub(geo_codes, start = 1L, end = 3L),
@@ -128,7 +123,13 @@ gdp_long <- gdp_long |>
 
 ```
 
+```{r}
+# laste inn datasett 2, befolkning per 1. januar:
 
+Pop <- readxl::read_excel ("demo_r_pjanaggr3__custom_18648204_spreadsheet_uten_flags.xlsx")
+
+
+```
 
 
 ```{r}
@@ -167,56 +168,24 @@ Pop_long |>
 
 ```
 
-
-
-
 ```{r}
-library(dplyr)
-library(stringr)
-library(readr)
-library(tidyr)
-
-# 1) Finn år-kolonner
-year_cols <- intersect(names(Pop), as.character(2000:2023))
-
-# 2) Rydd bort GEO-rader (hvis ikke gjort)
-Pop <- Pop %>%
-  filter(!str_detect(geo_kode, "^GEO (Codes)"), geo_navn != "GEO (Labels)")
-
-# 3) Gjør ALLE år-kolonner til numeric, robust for både character og double
-Pop <- Pop %>%
-  mutate(
-    across(
-      all_of(year_cols),
-      ~ readr::parse_number(
-          as.character(.),                     # tving til tekst først
-          locale = readr::locale(
-            decimal_mark   = ",",              # 23 859,75
-            grouping_mark  = " "               # tusenskilletegn
-          )
-        )
-    )
-  )
-
+# Sjekk
+gdp_long |>
+  slice_head(n = 10)
 ```
 
 
-RIKTIG!! BEHOLD
-```{r}
-# vis de første radene
-gdp |> dplyr::slice_head(n = 10)
 
-```
 
-RIKTIG!! BEHOLD
 ```{r}
 # Viser de første radene
 Pop |> dplyr::slice_head(n = 10)
 ```
 
 
-RIKTIG!! BEHOLD
+
 ```{r}
+# Sjekker begge to gdp_long og Pop_long
 gdp_long |> dplyr::slice_head(n = 10)
 Pop_long |> dplyr::slice_head(n = 10)
 
@@ -228,7 +197,7 @@ Pop_long |> dplyr::slice_head(n = 10)
 
 ```{r}
 library(dplyr)
-library(readr)  # for parse_number if du trenger det
+library(readr)  # for parse_number  
 
 # 1) Standardiser kolonnenavn og typer -------------------------
 # Anta at du har:
@@ -236,7 +205,7 @@ library(readr)  # for parse_number if du trenger det
 #   Pop_long:  geo_kode, geo_navn, år, befolkning   (dbl)
 
 gdp <- gdp_long %>%
-  rename(geo = geo_codes, geo_name = geo_names, year = year, gdp_mio_eur = gdp) %>%
+  rename(geo = geo_codes, geo_name = geo_names, year = Year, gdp_mio_eur = gdp) %>%
   mutate(year = as.integer(year))
 
 pop <- Pop_long %>%
@@ -258,7 +227,7 @@ gdp_pop <- gdp_pop %>%
 # Kjapp sanity check
 gdp_pop %>% slice_head(n = 10)
 
-# Valgfritt: 2023-oversikt for dine land (ES, AT, CZ, SI, EE)
+# 2023-oversikt for våre land (ES, AT, CZ, SI, EE)
 oversikt_2023 <- gdp_pop %>%
   filter(year == 2023, grepl("^(ES|AT|CZ|SI|EE)", geo)) %>%
   arrange(desc(gdpc_eur)) %>%
@@ -267,7 +236,6 @@ oversikt_2023 <- gdp_pop %>%
 oversikt_2023 %>% slice_head(n = 10)
 
 ```
-
 
 
 
@@ -282,7 +250,13 @@ Vi analyserer BNP per innbygger (GDPC) på NUTS-3-nivå for Østerrike (AT), Tsj
 library(dplyr)
 library(ggplot2)
 
+# Definer landene vi skal ha med (IS02-landkoder), brukes til å filtrere datasettet vårt
+
 land <- c("ES","AT","CZ","SI","EE")
+
+# Trekker ut landkode fra NUTS-koden og filtrer 
+# Substr(geo, 1, 2): tar de 2 første tegnene i geo (landkode)
+# Filter(country %in% land): beholder de landene vi trenger
 
 gdpc <- gdp_pop %>%
   mutate(country = substr(geo, 1, 2)) %>%
@@ -292,17 +266,19 @@ gdpc <- gdp_pop %>%
 
 
 ```{r}
+# Sammendrag av GDPC per land (hele perioden), grupperer i land, beregner sentraltendens og spredning, håndterer manglende verdier (na.rm = TRUE)
+
 stats_land_all <- gdpc %>%
   group_by(country) %>%
   summarise(
-    n_obs   = n(),
-    mean    = mean(gdpc_eur, na.rm = TRUE),
-    sd      = sd(gdpc_eur, na.rm = TRUE),
-    q1      = quantile(gdpc_eur, 0.25, na.rm = TRUE),
-    median  = median(gdpc_eur, na.rm = TRUE),
-    q3      = quantile(gdpc_eur, 0.75, na.rm = TRUE),
-    min     = min(gdpc_eur, na.rm = TRUE),
-    max     = max(gdpc_eur, na.rm = TRUE),
+    n_obs   = n(),                                    # antall observasjoner
+    mean    = mean(gdpc_eur, na.rm = TRUE),           # gjennomsnitt              
+    sd      = sd(gdpc_eur, na.rm = TRUE),             # standardavvik    
+    q1      = quantile(gdpc_eur, 0.25, na.rm = TRUE), # nedre kvartil   
+    median  = median(gdpc_eur, na.rm = TRUE),         # median   
+    q3      = quantile(gdpc_eur, 0.75, na.rm = TRUE), # øvre kvartil
+    min     = min(gdpc_eur, na.rm = TRUE),            # minimum
+    max     = max(gdpc_eur, na.rm = TRUE),            # maksimum
     cv      = sd/mean  # variasjonskoeffisient
   )
 stats_land_all
@@ -321,7 +297,11 @@ Kort sagt: AT høyt nivå og stor ulikhet, ES jevnere fordeling, SI middels, men
 
 
 ```{r}
+# Behold bare observasjoner fra 2023
+
 gdpc_2023 <- gdpc %>% filter(year == 2023)
+
+# Sammendrag per land (2023)
 
 stats_land_2023 <- gdpc_2023 %>%
   group_by(country) %>%
@@ -333,15 +313,21 @@ stats_land_2023 <- gdpc_2023 %>%
     max  = max(gdpc_eur, na.rm = TRUE)
   )
 
+# Topp 10 regioner i 2023 (høyest GDPC)
+
 topp10_2023 <- gdpc_2023 %>%
   arrange(desc(gdpc_eur)) %>%
   select(geo, geo_name, country, gdpc_eur) %>%
   slice_head(n = 10)
 
+# Bunn 10 regioner i 2023 (lavest GDPC)
+
 bunn10_2023 <- gdpc_2023 %>%
   arrange(gdpc_eur) %>%
   select(geo, geo_name, country, gdpc_eur) %>%
   slice_head(n = 10)
+
+# Kjapp visning
 
 stats_land_2023
 topp10_2023
@@ -355,10 +341,13 @@ bunn10_2023
 
 ```{r}
 # Tidsutvikling av landsgjennomsnitt (2000–2023)
+# Aggreger til land x år: gjennomsnittlig GDPC
 
 gdpc_country_mean <- gdpc %>%
   group_by(country, year) %>%
   summarise(mean_gdpc = mean(gdpc_eur, na.rm = TRUE), .groups = "drop")
+
+# Plot tidsserier per land
 
 library(ggplot2)
 
@@ -429,9 +418,9 @@ Histogrammet for Tsjekkia 2023 viser en høyreskjev fordeling. De fleste regione
 
 ## Litteraturoversikt
 
-Artikkelen bygger et globalt datasett for regional inntektsulikhet ved å predikere regionale inntekter fra nattlys-satellittdata, og bruker disse til å beregne standard mål som befolkningsvektet Gini og generaliserte entropi-mål. Poenget er at lysintensitet henger stabilt sammen med regional økonomisk aktivitet, og at predikert inntekt (korrigert for målefeil som «top-coding» og «zero-coding») fanger reelle (ikke bare nominelle) forskjeller bedre enn lys alene.
+Artikkelen Lessmann Seidel fra 2017 bygger på et globalt datasett for regional inntektsulikhet ved å predikere regionale inntekter fra nattlys-satellittdata, og bruker disse til å beregne standard mål som befolkningsvektet Gini og generaliserte entropi-mål. Poenget er at lysintensitet henger stabilt sammen med regional økonomisk aktivitet, og at predikert inntekt (korrigert for målefeil som «top-coding» og «zero-coding») fanger reelle (ikke bare nominelle) forskjeller bedre enn lys alene.
 
-De finner at om lag 67–70 % av landene opplever sigma-konvergens (fallende spredning mellom regioner) over tid, men at en ikke-triviell andel har økende ulikhet. Samtidig estimeres et N-formet (Kuznets-liknende) forhold mellom utviklingsnivå og regional ulikhet: svært fattige land får økende ulikhet i starten, mellominntektsland ser fallende ulikhet, mens de aller rikeste kan ha en svak ny økning.
+De finner at om lag 67–70 % av landene opplever sigma-konvergens (fallende spredning mellom regioner) over tid, men at en ikke-triviell andel har økende ulikhet. Samtidig estimeres et N-formet (Kuznets-liknende) forhold mellom utviklingsnivå og regional ulikhet: svært fattige land får økende ulikhet i starten, mellominntektsland ser fallende ulikhet, mens de aller rikeste kan ha en svak ny økning [@lessmann_seidel_2017].
 
 I panelanalyser finner de at naturressurser, handelsåpenhet, transportkostnader, bistand og etnisk ulikhet henger positivt sammen med regional ulikhet, mens dyrkbar mark-andel, føderalisme og humankapital (utdanning) henger negativt sammen. Praktisk for vår oppgave er også begrunnelsen for befolkningsvekting: når regioner har svært ulik størrelse/befolkning, må ulikhetsmål gi små regioner lavere vekt for å si noe meningsfullt om «inter-gruppe» ulikhet innen landet.
 
@@ -453,7 +442,7 @@ gdpc <- gdpc %>%
     NUTS1 = str_sub(geo, 1, 3)
   )
 
-# 1) Kvalitetsfilter (valgfritt, men lurt):
+# 1) Kvalitetsfilter 
 #    - gyldige tall for gdpc_eur og pop
 #    - minst 3 NUTS-3-enheter per (country, NUTS2, year)
 gdpc_clean <- gdpc %>%
@@ -472,7 +461,7 @@ gini_nuts2_year <- gdpc_clean %>%
     .groups = "drop"
   )
 
-# 3) Lag også 2023-snitt og ev. rangeringer (nyttig til tabeller/figurer)
+# 3) Lag også 2023-snitt og ev. rangeringer 
 gini_2023 <- gini_nuts2_year %>%
   filter(year == 2023) %>%
   arrange(country, desc(gini_w))
@@ -516,6 +505,10 @@ Figurene under viser tidsutviklingen i regional ulikhet målt som befolkningsvek
 
 
 ```{r}
+# Tidsutvikling i regional ulikhet (Gini) innen NUTS-2
+# Viser utviklingen i befolkningsvektet Gini (gini_w) over tid
+# En panel-figur (facet) per land, men én linje per NUTS-2 region 
+
 library(ggplot2)
 
 ggplot(gini_nuts2_year,
@@ -542,9 +535,11 @@ Mønstrene varierer tydelig. Østeriket (AT) starter høyt og faller svakt over 
 Tabellen rangerer NUTS-2-regioner i 2023 etter befolkningsvektet Gini for BNP per innbygger (høyere = mer ulikhet mellom NUTS-3 i samme NUTS-2). Kolonnen "n_nuts3" viser hvor mange NUTS-3 som inngår i beregningen. Dette sier noe om hvor robust målet er (få underenheter --> mer følsomt).
 
 ```{r}
+# Rangering 2023: "topp 10" og "bunn 10" NUTS-2 (befolkningsvektet Gini)
+
 topp10_gini_2023 <- gini_2023 %>%
   arrange(desc(gini_w)) %>%
-  slice_head(n = 10)
+  slice_head(n = 10)                          # Sorterer fallende på Gini
 
 bunn10_gini_2023 <- gini_2023 %>%
   arrange(gini_w) %>%
@@ -559,6 +554,21 @@ bunn10_gini_2023
 Rangeringen bekrefter hovedmønstrene vi har sett i tidsseriene. EE00 ligger helt i toppen i 2023 (Gini ≈ 0,16), noe som peker på markert intern ulikhet mellom etiske NUTS-3. Også SI04 fremstår som relativt ulik (Gini ≈ 0,12), mens andre slovenske NUTS-2, som SI03, ligger mer moderat (Gini ≈ 0,06). I den andre enden finner vi CZ05 med lav ulikhet (Gini ≈ 0,04). Samlet tyder dette på at Estland fortsatt er mest polarisert, Slovenia er mellomnivå men heterogent på tvers av NUTS-2, mens tsjekkiske regioner ligger stabilt lavt. Merk at vurderingen bør ta hensyn til antall underregioner (n_nuts3). Få NUTS-3 kan gi mer volatile Gini-anslag.
 
 
+
+# Del C: Bruk av KI-verktøy i arbeidet
+
+Denne rapporten er utarbeidet med bistand fra KI-verktøy. Det primære verktøyet var ChatGPT (GPT-5, OpenAI), som ble brukt til å støtte både tekniske og språklige deler av arbeidet. Vi tok i bruk KI-verktøyet til å tydliggjøre oppgaveinstruksene og tolke datakrav fra Eurostat. Det ble også tatt i bruk for å foreslå struktur og formuleringer i drøftingsdelen.
+
+Alle numeriske resultater og figurer ble generert lokalt i RStudio med R versjon 4.5.1 og Quarto-rammeverket. KI-systemet hadde ikke direkte tilgang til datasett og kjørte ikke kode på egen hånd. Endelig kode, resultater og tolkninger ble manuelt verifisert av oss selv før innlevering.
+
+
+# Kilder 
+
+Lessmann, C., & Seidel, A. (2017). Regional inequality, convergence, and its determinants – A view from outer space. European Economic Review, 92, 110–132. https://doi.org/10.1016/j.euroecorev.2016.11.009
+
+European Commission, Eurostat. (2025). Regional gross domestic product (by NUTS 3) [nama_10r_3gdp]. Hentet 28. oktober 2025 fra https://ec.europa.eu/eurostat
+
+European Commission, Eurostat. (2025). Population on 1 January by age group, sex and NUTS 3 region [demo_r_pjanaggr3]. Hentet 28. oktober 2025 fra https://ec.europa.eu/eurostat
 
 
 
