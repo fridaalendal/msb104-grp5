@@ -16,8 +16,318 @@ execute:
   # kan slås av for endelig rapport
   warning: false  # skjul advarsler i output
   message: false  # skjul meldinger i output
+
 ---
 
+```{r}
+#| label: load-ass1-objects
+#| message: false
+#| warning: false
+
+# Les alle .rds i data/ og gjør dem tilgjengelige som objekter
+rds_files <- list.files("data", pattern = "\\.rds$", full.names = TRUE)
+stopifnot(length(rds_files) > 0)   # vennlig feilmelding om mappa er tom
+
+loaded <- lapply(rds_files, readRDS)
+names(loaded) <- sub("\\.rds$", "", basename(rds_files))
+list2env(loaded, .GlobalEnv)
+
+# Sjekk at nøkkelobjektene finnes
+needed <- c("gini_nuts2_year", "dev_2000_2017")
+missing <- setdiff(needed, ls())
+if (length(missing)) stop("Mangler: ", paste(missing, collapse = ", "),
+                         ". Lagre dem først i Ass1 (saveRDS).")
+
+```
+
+
+
 # Del A: 
+
+
+```{r}
+# Pakker vi trenger ---------------------------------------------------------
+# dplyr/tidyr: datamanipulasjon, broom: pene modelltabeller, ggplot2: figur
+library(dplyr)
+library(tidyr)
+library(broom)
+library(ggplot2)
+
+```
+
+```{r}
+#| label: setup-data
+#| message: false
+#| warning: false
+
+library(dplyr)
+library(dineq)   # gini.wtd
+
+land <- c("ES","AT","CZ","SI","EE")  # landene deres
+
+# Sjekk at kolonnene finnes (gir klar feilmelding om noe mangler)
+stopifnot(all(c("year","gdpc_eur","pop","NUTS2","country","geo") %in% names(gdpc_clean)))
+
+# 1) Avgrens til riktige land og år (bruk YEAR, ikke time)
+n3 <- gdpc_clean %>%
+  filter(country %in% land, year >= 2000, year <= 2017) %>%
+  select(country, NUTS2, geo, year, gdpc = gdpc_eur, pop)
+
+# 2) Aggreger til NUTS-2 per år:
+#    - mean_y: pop-vektet BNP p.c.
+#    - gini_w: GINI innen NUTS-2 (beregnet fra NUTS-3)
+gini_nuts2_year <- n3 %>%
+  group_by(country, NUTS2, year) %>%
+  summarise(
+    n_nuts3 = dplyr::n_distinct(geo),                 # hvor mange NUTS-3 inngår
+    mean_y  = weighted.mean(gdpc, pop, na.rm = TRUE), # pop-vektet gj.snitt
+    gini_w  = dineq::gini.wtd(gdpc, weights = pop),   # GINI av NUTS-3 verdier
+    .groups = "drop"
+  )
+
+```
+
+
+
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+# (A) Avgrens til landene deres (hvis du vil)
+land <- c("ES","AT","CZ","SI","EE")
+g2 <- gini_nuts2_year %>% filter(country %in% land)
+
+# (B) Finn "baseline"-år per NUTS-2: 2000 hvis finnes, ellers første år ≥ 2000
+#    -> Sikrer at regioner som starter i f.eks. 2001 ikke droppes.
+base_year <- g2 %>%
+  group_by(NUTS2, country) %>%
+  summarise(
+    y0_year = ifelse(any(year == 2000),
+                     2000,
+                     min(year[year >= 2000], na.rm = TRUE)),
+    .groups = "drop"
+  )
+
+# (C) Hent BNP p.c. i baseline-året (y0) og i 2017 (y17)
+y0 <- g2 %>%
+  inner_join(base_year, by = c("NUTS2","country")) %>%
+  filter(year == y0_year) %>%
+  transmute(NUTS2, country, y0 = mean_y)
+
+y17 <- g2 %>%
+  filter(year == 2017) %>%
+  transmute(NUTS2, country, y17 = mean_y)
+
+# (D) Beregn utvikling som log-vekst: log(y17) - log(y0)
+#     -> Nå får du med alle regioner som har begge år (baseline og 2017).
+dev_2000_2017 <- y0 %>%
+  inner_join(y17, by = c("NUTS2","country")) %>%
+  mutate(dev_log = log(y17) - log(y0)) %>%
+  select(country, NUTS2, dev_log)
+
+# (E) Rask sanity check: hvor mange NUTS-2 fikk vi per land?
+dev_2000_2017 %>%
+  count(country, name = "n_nuts2")
+
+```
+
+
+
+```{r}
+# Lager kryss-snittet for 2017 
+# 1) GINI i 2017 (målt på NUTS-2). Vi trenger dette som Y-variabel.
+gini_2017 <- gini_nuts2_year %>%
+  dplyr::filter(year == 2017) %>%
+  dplyr::select(country, NUTS2, gini_w, n_nuts3)
+
+# 2) Slå sammen med utviklingsmålet (X-variabelen)
+#    -> cs_2017 blir datasettet vi estimerer på.
+cs_2017 <- gini_2017 %>%
+  dplyr::inner_join(dev_2000_2017, by = c("country","NUTS2"))
+
+# 3) Sjekk hvor mange regioner per land vi faktisk analyserer (din tabell)
+coverage <- cs_2017 %>%
+  dplyr::count(country, name = "n_nuts2")
+coverage
+
+```
+
+## Data og utvalg
+
+Vi analyserer NUTS-2-regioner i **AT, CZ, EE, ES og SI**. Avhengig variabel (**Y**) er **GINI i 2017** på NUTS-2, beregnet fra NUTS-3 med befolkningsvekter. Forklaringsvariabelen (**X**) er **regional utvikling** definert som log-vekst i BNP per innbygger fra første tilgjenlige år ≥ 2000 til 2017.
+
+Vi inkluderer bare regioner som har både baseline og 2017. Dette gir totalt **`r nrow(cs_2017)`** NUTS-2 regioner. Dekning per land vises i Tabell @tbl-coverage.
+
+
+```{r}
+# Regioner som mangler 2017 eller ikke har nok NUTS-3 til å beregne GINI
+mangler_2017 <- gini_nuts2_year %>%
+  dplyr::group_by(country, NUTS2) %>%
+  dplyr::summarise(
+    har_2017 = any(year == 2017),
+    n_nuts3_2017 = dplyr::if_else(har_2017, max(n_nuts3[year == 2017], na.rm = TRUE), NA_real_),
+    .groups = "drop"
+  ) %>%
+  dplyr::filter(!har_2017 | is.na(n_nuts3_2017) | n_nuts3_2017 < 2)
+
+# Regioner som har 2017 men som mangler baseline-år for vekst (meget sjelden etter vår "første>=2000"-regel)
+har_2017 <- gini_nuts2_year %>% dplyr::filter(year == 2017) %>% dplyr::select(country, NUTS2) %>% dplyr::distinct()
+i_cs <- cs_2017 %>% dplyr::select(country, NUTS2) %>% dplyr::distinct()
+mangler_i_cs <- dplyr::anti_join(har_2017, i_cs, by = c("country","NUTS2"))
+
+mangler_2017   # til appendiks/notat
+mangler_i_cs   # til appendiks/notat
+
+```
+
+## Modell
+
+Vi undersøker om regional økonomisk utvikling henger sammen med ulikhet mellom regioner i 2017. Ulikhet måles som Gini på NUTS-2-nivå, og utvikling måles som vekst i BNP per innbygger fram til 2017. Tanken er at regioner som har vokst mer, kan få større forskjeller internt, men dette trenger ikke være sterkt eller gjelde overalt.
+
+Sterkere økonomisk opphenting kan øke intern spredning (positivt β), men sammenhengen kan være svak og påvirkes av regionale strukturer og sammensetning.
+
+
+```{r}
+# Vis hva som faktisk er i kryss-snittet vårt ------------------------------
+# (du bør allerede ha laget cs_2017 tidligere i dokumentet)
+dplyr::glimpse(cs_2017)       # rask struktur
+nrow(cs_2017)                 # antall regioner
+
+coverage <- cs_2017 %>%
+  dplyr::count(country, name = "n_nuts2")
+coverage                      # dekning per land (skrives ut i pdf)
+
+# OLS med robuste SE --------------------------------------------------------
+m1 <- lm(gini_w ~ dev_log, data = cs_2017)
+
+# Pene tabeller i dokumentet:
+if (!requireNamespace("knitr", quietly = TRUE)) install.packages("knitr")
+if (!requireNamespace("broom", quietly = TRUE)) install.packages("broom")
+if (!requireNamespace("sandwich", quietly = TRUE)) install.packages("sandwich")
+if (!requireNamespace("lmtest", quietly = TRUE)) install.packages("lmtest")
+
+knitr::kable(broom::tidy(m1), caption = "OLS: GINI (2017) på utvikling (log-vekst)")
+knitr::kable(broom::glance(m1), caption = "Modellmål (R², adj. R², n)")
+
+# Robuste standardfeil (HC1)
+lmtest::coeftest(m1, vcov = sandwich::vcovHC(m1, type = "HC1"))
+
+```
+
+
+## Resultater og tolkning
+
+Modellen indikerer en positiv sammenheng mellom regional utvikling og ulikhet i 2017. Koeffisienten på utvikling er ...
+t = r sprintf("%.2f", t_hc1), p= r format.pval(p_hc1, digits = 3) (n = r nobs_m1). Tolket i skala: rundt 10% høyere vekst (Δ log ≈ 0.10) er forbundet med r sprintf("%.3f", 0.10*beta_hat) høyere Gini i 2017. Modellen har moderat forklaringskraft (R^2 = r sprintf("%.2f", r2), justert R^2 = r sprintf("%.2f", r2a)), og spredingen i Figur @fig-ulikhet-utvikling viser at vekst alene ikke forklarer all variasjon mellom regioner. 
+
+
+
+
+```{r}
+# Figur ---------------------------------------------------------------------
+ggplot2::ggplot(cs_2017, ggplot2::aes(x = dev_log, y = gini_w, label = NUTS2)) +
+  ggplot2::geom_point() +
+  ggplot2::geom_smooth(method = "lm", se = TRUE) +
+  ggplot2::labs(
+    x = "Regional utvikling (log-vekst i BNP p.c. til 2017)",
+    y = "Regional ulikhet (GINI, NUTS-2, 2017)",
+    title = "Ulikhet vs. utvikling (NUTS-2, våre land)",
+    caption = "Utvikling: log(y2017) – log(y_baseline≥2000). GINI fra NUTS-3 i 2017."
+  ) +
+  ggplot2::theme_minimal()
+
+```
+
+## Slik leses figuren 
+
+Figuren viser sammenhengen mellom regional utvikling (x-akse: log-vekst i BNP p.c. fram til 2017) og ulikhet (y-akse: Gini i 2017 på NUTS-2). Hver prikk er én region, den blå linjen er OLS-estimatet, og det grå båndet er 95% konfidensintervall. Helningen er svak positiv, som betyr at regioner med høyere vekst tenderer til noe høyere intern ulikhet i 2017. Usikkerheten er relativt stor (spesielt ved høy vekst, der vi har færre observasjoner), så vekst alene forklarer ikke all variasjon mellom regionene.
+
+
+```{r}
+# install.packages("ggrepel")
+library(ggrepel)
+ggplot(cs_2017, aes(dev_log, gini_w, label = NUTS2)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  ggrepel::geom_text_repel(size = 3)
+
+```
+## Hva det betyr i praksis
+
+Funnene peker på at sterk regional vekst kan følges av noe større forskjeller innad i regionen. For politikere og planleggere betyr det at tiltak som fremmer vekst kan med fordel kombineres med tiltak som sørger for bred deltakelse i verdiskapingen – for eksempel kompetanseheving, mobilitet i arbeidsmarkedet og inkluderende næringsutvikling.
+
+
+# Del B: Andre drivkrefter bak regional ulikhet
+
+Vi utvider modellen ved å legge til tre regionale kjennetegn på NUTS-2 (2017): andel med høyere utdanning (ED5–8, 25–64 år), arbeidsledighet (15–74 år) og sysselsettingsrate (20–64 år). Variablene hentes direkte fra Eurostat og kobles på datasettet fra del A.
+
+```{r}
+# Pakker
+library(eurostat)   # hente indikatorer
+library(dplyr)      # datahåndtering
+library(stringr)    # strengverktøy
+library(lubridate)  # år-uttrekk fra dato
+library(broom)      # pene regresjonstabeller
+library(sandwich)   # robuste SE
+library(lmtest)     # coeftest med robust vcov
+
+# Land vi jobber med
+land_nuts2 <- c("AT","CZ","EE","ES","SI")
+
+# Sjekk at kryss-snittet fra Del A finnes
+stopifnot(exists("cs_2017"))
+
+```
+
+
+
+
+
+
+# Del C: Kildebruk
+
+
+
+ 
+
+ 
+ 
+ 
+
+ 
+ 
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
