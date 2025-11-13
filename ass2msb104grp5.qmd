@@ -21,14 +21,6 @@ execute:
 
 
 
-
-
-
-
-
-
-
-
 ```{r}
 #| label: load-ass1-objects
 #| message: false

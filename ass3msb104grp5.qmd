@@ -1,0 +1,21 @@
+---
+title: "Assignment3 msb104"
+author: Frida Alendal og Katinca Valvatne 
+lang: NO_nb
+editor: visual
+toc: true
+number-sections: true
+format:
+  pdf:
+    pdf-engine: xelatex
+    geometry: margin=2.5cm
+    keep-tex: false
+execute:
+  echo: true      # vis kode
+  # ag: vil anbefale å ha disse på mens dere utvikler
+  # kan slås av for endelig rapport
+  warning: false  # skjul advarsler i output
+  message: false  # skjul meldinger i output
+---
+
+
