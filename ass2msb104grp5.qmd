@@ -19,6 +19,16 @@ execute:
 
 ---
 
+
+
+
+
+
+
+
+
+
+
 ```{r}
 #| label: load-ass1-objects
 #| message: false
@@ -167,13 +177,18 @@ mangler_2017 <- gini_nuts2_year %>%
   dplyr::group_by(country, NUTS2) %>%
   dplyr::summarise(
     har_2017 = any(year == 2017),
-    n_nuts3_2017 = dplyr::if_else(har_2017, max(n_nuts3[year == 2017], na.rm = TRUE), NA_real_),
+    n_nuts3_2017 = dplyr::if_else(
+      har_2017, max(n_nuts3[year == 2017], na.rm = TRUE), NA_real_),
     .groups = "drop"
   ) %>%
   dplyr::filter(!har_2017 | is.na(n_nuts3_2017) | n_nuts3_2017 < 2)
 
-# Regioner som har 2017 men som mangler baseline-år for vekst (meget sjelden etter vår "første>=2000"-regel)
-har_2017 <- gini_nuts2_year %>% dplyr::filter(year == 2017) %>% dplyr::select(country, NUTS2) %>% dplyr::distinct()
+# Regioner som har 2017 men som mangler baseline-år for vekst 
+har_2017 <- gini_nuts2_year %>% 
+  dplyr::filter(year == 2017) %>% 
+  dplyr::select(country, NUTS2) %>% 
+  dplyr::distinct()
+
 i_cs <- cs_2017 %>% dplyr::select(country, NUTS2) %>% dplyr::distinct()
 mangler_i_cs <- dplyr::anti_join(har_2017, i_cs, by = c("country","NUTS2"))
 
@@ -254,6 +269,9 @@ ggplot(cs_2017, aes(dev_log, gini_w, label = NUTS2)) +
   ggrepel::geom_text_repel(size = 3)
 
 ```
+Figuren over viser den samme sammenhengen mellom utvikling og ulikhet som i hovedfiguren, men her er hver prikk merket med NUTS-2-koden til regionen. Det gjør det lettere å se hvilke regioner som driver mønsteret i dataene. For eksempel ligger EE00 høyt både på vekst og ulikhet, mens flere spanske regioner (ES-kodene) har forholdsvis lav ulikhet gitt utviklingsnivået sitt. Poenget er ikke å tolke hver enkelt region i detalj, men å illustrere hvilke konkrete regioner som ligger nærmest og lengst fra regresjonslinjen.
+
+
 ## Hva det betyr i praksis
 
 Funnene peker på at sterk regional vekst kan følges av noe større forskjeller innad i regionen. For politikere og planleggere betyr det at tiltak som fremmer vekst kan med fordel kombineres med tiltak som sørger for bred deltakelse i verdiskapingen – for eksempel kompetanseheving, mobilitet i arbeidsmarkedet og inkluderende næringsutvikling.
@@ -261,73 +279,125 @@ Funnene peker på at sterk regional vekst kan følges av noe større forskjeller
 
 # Del B: Andre drivkrefter bak regional ulikhet
 
-Vi utvider modellen ved å legge til tre regionale kjennetegn på NUTS-2 (2017): andel med høyere utdanning (ED5–8, 25–64 år), arbeidsledighet (15–74 år) og sysselsettingsrate (20–64 år). Variablene hentes direkte fra Eurostat og kobles på datasettet fra del A.
+I del A så vi på sammenhengen mellom regionalt utviklingsnivå (log BNP per innbygger) og inntektsulikhet målt ved Gini for 21 NUTS2 regioner i Estland, Slovenia, Tsjekkia, Østerrike og Spania. Det ga et første-bilde av hvordan rikere regioner skiller seg fra fattigere regioner. I del B utvider vi denne modellen ved å legge til tre regionale kjennetegn i 2017: andel av befolkningen med høyere utdanning, arbeidsledighetsrate og befolkningstetthet. Variablene hentes fra Eurostat og kobles til datasettet fra del A. Målet er å undersøke om disse faktorene kan bidra til å forklare hvorfor noen regioner har høyere inntektsulikhet enn andre, utover forskjeller i utviklingsnivå alene. 
+
+
 
 ```{r}
-# Pakker
-library(eurostat)   # hente indikatorer
-library(dplyr)      # datahåndtering
-library(stringr)    # strengverktøy
-library(lubridate)  # år-uttrekk fra dato
-library(broom)      # pene regresjonstabeller
-library(sandwich)   # robuste SE
-library(lmtest)     # coeftest med robust vcov
+library(readxl)
+library(dplyr)
 
-# Land vi jobber med
-land_nuts2 <- c("AT","CZ","EE","ES","SI")
+# 1. Gini + evt. growth fra del A (bytt ut med deres objekt/fil)
+gini_2017 <- gini_2017  # eller read_rds("gini_2017.rds") osv.
 
-# Sjekk at kryss-snittet fra Del A finnes
-stopifnot(exists("cs_2017"))
+# 2. Utdanning
+edu <- read_excel("edat_lfse_04_2017_tertiary_Y25_64.xlsx") |>
+  rename(
+    nuts2        = `GEO (Codes)`,
+    edu_tertiary = `2017`
+  ) |>
+  filter(!is.na(edu_tertiary))
+
+# 3. Arbeidsledighet
+unemp <- read_excel("tgs00010_unemployment_2017.xlsx") |>
+  rename(
+    nuts2       = `GEO (Codes)`,
+    unemp_rate  = `2017`
+  ) |>
+  filter(!is.na(unemp_rate))
+
+# 4. Befolkningstetthet
+dens <- read_excel("tgs00024_popdensity_2017.xlsx") |>
+  rename(
+    nuts2        = `GEO (Codes)`,
+    pop_density  = `2017`
+  ) |>
+  filter(!is.na(pop_density))
+
+# 5. slå sammen alt i ett datasett til del B
+data_B <- gini_2017 |>
+  left_join(edu,   by = c("NUTS2" = "nuts2")) |>
+  left_join(unemp, by = c("NUTS2" = "nuts2")) |>
+  left_join(dens,  by = c("NUTS2" = "nuts2"))
+
+```
+
+```{r}
+glimpse(data_B)
+nrow(data_B)  #Bare for å sjekke
+
+```
+
+
+```{r}
+# Slå sammen utviklingsvariabelen inn i data_B
+data_B2 <- data_B |>
+  left_join(dev_2000_2017 |> select(NUTS2, dev_log),
+            by = "NUTS2")
+
+glimpse(data_B2)
+
+```
+```{r}
+data_B3 <- data_B2 |>
+  # Gjør utdanning, ledighet og tetthet om til tall
+  dplyr::mutate(
+    edu_tertiary = as.numeric(edu_tertiary),
+    unemp_rate   = as.numeric(unemp_rate),
+    pop_density  = as.numeric(pop_density)
+  )
 
 ```
 
 
 
+```{r}
+mod_B <- lm(
+  # Linær regresjon for del B:
+  # Gini forklart av utvikling + tre regionkjennetegn 
+  gini_w ~ dev_log + edu_tertiary + unemp_rate + pop_density,
+  data = data_B3
+)
+
+summary(mod_B)
+
+```
+
+
+I del B utvider vi modellen fra del A ved å inkludere tre regionale kjennetegn på NUTS2-nivå i 2017: andel med høyere utdanning, arbeidsledighetsrate og befolkningstetthet, i tillegg regionalt utviklingsnivå (log BNP per innbygger). Den utvidede modellen forklarer om lag 34% av variasjonen i Gini-koeffisienten mellom regionene (R² ≈ 0,34), men den justerte R²-verdien er bare 0,18. F-testene for hele modellen er ikke statistisk signifikant på 5-prosentnivå (p ≈ 0,13), og ingen av de enkelte forklaringsvariablene har signifilkante koeffisienter. Koeffisientene peker likevel i noen retninger som er interessante. Høyer BNP per innbygger og større andel med høyere utdanning er svakt positivt assosiert med høyere ulikhet. Høyere arbeidsledighet og høyere bfolkningstetthet er svakt negativt assosiert med ulikhet når vi holder de nadre variablene faste. Siden vi bare har 21 regioner og stpr usikkerhet rundt estimatene, bør disse sammenhengene tolkes som indikasjoner og ikke som sterke bevis for kausale effekter. 
 
 
 
 # Del C: Kildebruk
 
+I denne oppgaven bygger vi på hermoniserte, offisielle statistikkilder fra Eurostat og et Gini-datasett basert på EU-SILC levert som vi selv bearbeidet i Assignment 1. Nedenfor gir vi en kort oversikt over hvilke kilder som er brukt, hvordan de er koblet, og hvilke svakheter de kan ha.
+
+## Datakilder
+
+- Gini 2017 (EU-SILC, bearbeidet i Assignment 1)
+Avhengig variabel er Gini-koeffisienten for disponible husholdningsinntekter i 2017 for NUTS2-regioner. Datasettet er konstruert av oss i Assignment 1, på grunnlag av EU-SILC-data og veiledning i emnet. Mulige svakheter er utvalgsusikkerhet og at små regioner kan ha mer støy i estimatene.
+
+- Regionalt BNP per innbygger (Eurostat, nama_10r_3gdp)
+Brukes til å beregne log BNP per innbygger i 2000 og 2017, samt vekst i utviklingsnivå. Dette er nasjonalt harmoniserte nasjonalregnskapsdata, men tallene kan være reviderte og sier lite om fordeling innad i regionene.
+
+- Regional befolkning per 1. januar (Eurostat, demo_r_pjanaggr3) 
+Ble brukt i Assingment 1 til å beregne befolkningsvekter og BNP per innbygger.
+
+- Andel med høyere utdanning (Eurostat, arbeidskraftundersøkelser)
+Variabelen edu_tertiary måler prosentandel av befolkningen 25–64 år med utdanning på nivå ED5–8. Dette er survey-baserte estimater og kan være noe usikre for små regioner.
+
+- Arbeidsledighetsrate (Eurostat, tgs00010)
+Måler registrert arbeidsledighet i prosent av arbeidsstyrken (15–74 år) på NUTS2-nivå. Tids- og definisjonsendringer kan påvirke sammenlignbarheten, men dataserien er harmonisert av Eurostat.
+
+- Befolkningstetthet (Eurostat, tgs00024)
+Antall personer per km² i 2017. Denne brukes som et enkelt mål på hvor urbane regionene er. En svakhet er at tetthet ikke fanger opp alle sider ved urbanisering og infrastruktur.
 
 
- 
+## Bruk av KI-verktøy (I tråd med HVL sin bruk av KI)
 
- 
- 
- 
+I oppgaven har vi brukt ChatGPT som støtteverktøy, i tråd med HVL sine retningslinjer for bruk av kunstig intelligens. KI-verktøyet ble brukt gjennom nettversjonen av ChatGPT (OpenAI, modell GPT-5.1 Thinking).
 
- 
- 
- 
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ChatGPT er brukt til å få forslag til og feilsøke R-kode. Alle valg av variabler, modellspesifikasjon, tolkning av resultater og konklusjoner er våre egne, basert på pensum og oppgaveteksten. Prompt-strategien har vært å stille konkrete, avgrensede spørsmål, for eksempel om en bestemt feilmelding i R. Svarene er blitt vurdert kritisk og testet mot egne resultater før de eventuelt er tatt i bruk. 
 
 
 
