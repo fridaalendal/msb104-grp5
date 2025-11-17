@@ -341,6 +341,15 @@ data_B3 <- data_B2 |>
 
 ```
 
+```{r}
+
+#| label: save-data_B3
+#| include: false
+
+saveRDS(data_B3, file = "data/data_B3.rds")
+
+
+```
 
 
 ```{r}

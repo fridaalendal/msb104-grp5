@@ -19,3 +19,424 @@ execute:
 ---
 
 
+
+
+```{r}
+# Laster nødvendige pakker for del A
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# Last inn data_B3 fra Assignment 2
+data_B3 <- readRDS("data/data_B3.rds")
+
+```
+
+```{r}
+
+list.files("data")
+
+```
+
+```{r}
+
+# Laster inn datasett som ble lagret i Assignment 1/2
+gini_nuts2_year <- readRDS("data/gini_nuts2_year.rds")
+dev_2000_2017   <- readRDS("data/dev_2000_2017.rds")
+
+```
+
+
+# Del A: Testing av utviklingseffekter på tvers av undergrupper
+
+```{r}
+
+# Forutsetter at data_B3 er laget som i Assignment 2
+# Vi lager tre grupper basert på tertiler av høyere utdanning
+
+data_A <- data_B3 %>% 
+  mutate(
+    edu_group3 = cut(
+      edu_tertiary,
+      breaks = quantile(edu_tertiary, probs = c(0, 1/3, 2/3, 1)),
+      include.lowest = TRUE,
+      labels = c("Low edu", "Mid edu", "High edu")
+    )
+  )
+
+# Sjekk at gruppene ble rimelige
+data_A %>% 
+  count(edu_group3)
+
+```
+
+```{r}
+# Regresjon gini ~ utvikling (dev_log) i hver utdanningsgruppe
+
+mod_low  <- lm(gini_w ~ dev_log, data = filter(data_A, edu_group3 == "Low edu"))
+mod_mid  <- lm(gini_w ~ dev_log, data = filter(data_A, edu_group3 == "Mid edu"))
+mod_high <- lm(gini_w ~ dev_log, data = filter(data_A, edu_group3 == "High edu"))
+
+summary(mod_low)
+summary(mod_mid)
+summary(mod_high)
+
+```
+
+```{r}
+# Modell uten interaksjon: samme dev_log-effekt i alle grupper
+mod_no_int <- lm(gini_w ~ dev_log + edu_group3, data = data_A)
+
+# Modell MED interaksjon: dev_log-effekt kan være ulik i gruppene
+mod_int <- lm(gini_w ~ dev_log * edu_group3, data = data_A)
+
+summary(mod_int)
+
+```
+
+
+
+```{r}
+# Likhetstest for helninger: 
+# H0: samme dev_log-effekt i alle grupper
+anova(mod_no_int, mod_int)
+
+```
+
+```{r}
+ggplot(data_A, aes(x = dev_log, y = gini_w, colour = edu_group3)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    x = "Regional utvikling (log BNP per innbygger)",
+    y = "Gini-koeffisient",
+    colour = "Utdanningsnivå"
+  ) +
+  theme_bw()
+
+```
+
+## Drøfting av delutvalgsanalyse 
+
+
+
+# Del B: Utforskning av alternative funksjonelle former
+
+## Funksjonell form-utforskning
+
+TEKST AV KATINCA: Kort tekst om hvorfor vi prøver kvadratisk/kubisk i stedet for bare lineær.
+
+```{r}
+# Lager et rent datasett for del B med bare variablene vi trenger
+data_B <- data_B3 |>
+  dplyr::select(NUTS2, gini_w, dev_log)
+
+```
+
+
+```{r}
+# Lager kvadratisk og kubisk form av dev_log
+data_B <- data_B |>
+  dplyr::mutate(
+    dev_log2 = dev_log^2,      # dev_log i andre
+    dev_log3 = dev_log^3       # dev_log i tredje
+  )
+
+# Sjekk at variablene ser fornuftige ut
+dplyr::glimpse(data_B)
+
+```
+
+
+```{r}
+# Referansemodell: lineær sammenheng mellom utvikling og ulikhet
+mod_lin <- lm(gini_w ~ dev_log, data = data_B)
+
+# Alternativ 1: kvadratisk funksjon (tillater bøyd kurve)
+mod_quad <- lm(gini_w ~ dev_log + dev_log2, data = data_B)
+
+# Alternativ 2: kubisk funksjon (enda mer fleksibel kurve)
+mod_cubic <- lm(gini_w ~ dev_log + dev_log2 + dev_log3, data = data_B)
+
+# Viser resultatene (Katinca bruker dette til å beskrive koeffisienter og signifikans)
+summary(mod_lin)
+summary(mod_quad)
+summary(mod_cubic)
+
+```
+
+
+
+```{r}
+# Samler nøkkeltall fra modellene i en liten tabell
+model_comp <- tibble::tibble(
+  modell   = c("Lineær", "Kvadratisk", "Kubisk"),
+  R2       = c(summary(mod_lin)$r.squared,
+              summary(mod_quad)$r.squared,
+              summary(mod_cubic)$r.squared),
+  adj_R2   = c(summary(mod_lin)$adj.r.squared,
+              summary(mod_quad)$adj.r.squared,
+              summary(mod_cubic)$adj.r.squared),
+  AIC      = c(AIC(mod_lin), AIC(mod_quad), AIC(mod_cubic))
+)
+
+model_comp
+
+```
+
+## Estemering og visualisering 
+TEKST AV KATINCA: Skriv her om figur + hvordan kurvene ser ut, og hva de betyr
+
+
+```{r}
+# Lager et "grid" av dev_log-verdier for å plotte glatte prediksjonskurver
+pred_grid <- data.frame(
+  dev_log = seq(
+    from = min(data_B$dev_log, na.rm = TRUE),
+    to   = max(data_B$dev_log, na.rm = TRUE),
+    length.out = 200
+  )
+)
+
+# Lag kvadratisk og kubisk variant også i pred_grid
+pred_grid <- pred_grid |>
+  dplyr::mutate(
+    dev_log2 = dev_log^2,
+    dev_log3 = dev_log^3
+  )
+
+# Predikert Gini for hver modell på samme grid
+pred_grid$gini_lin   <- predict(mod_lin,   newdata = pred_grid)
+pred_grid$gini_quad  <- predict(mod_quad,  newdata = pred_grid)
+pred_grid$gini_cubic <- predict(mod_cubic, newdata = pred_grid)
+
+```
+
+
+
+```{r}
+# Plotter datapunkter + tre kurver for de ulike funksjonelle formene
+ggplot(data_B, aes(x = dev_log, y = gini_w)) +
+  geom_point() +
+  geom_line(data = pred_grid,
+            aes(y = gini_lin, colour = "Lineær")) +
+  geom_line(data = pred_grid,
+            aes(y = gini_quad, colour = "Kvadratisk")) +
+  geom_line(data = pred_grid,
+            aes(y = gini_cubic, colour = "Kubisk")) +
+  labs(
+    x      = "Regional utvikling (log BNP per innbygger)",
+    y      = "Gini-koeffisient",
+    colour = "Funksjonell form"
+  ) +
+  theme_bw()
+
+```
+
+## Tolkning av resultater
+
+TEKST AV KATINCA: Her skrives 200–400 ord om koeffisienter, implikasjoner, hvilket funksjonsvalg som passer best, og sammenligning med den opprinnelige lineære modellen. Hvilken funksjonell form som passer best (bruk tabellen model_comp + figuren), sammenligning med den lineære modellen.
+
+
+
+# Del C: Test for heteroskedastisitet og drøfting av kausalitet 
+
+## Heteroskedastisitetstesting 
+
+TEKST AV KATINCA: Kort forklaring på hva heteroskedastisitet er og hvorfor vi tester for det.
+
+
+```{r}
+# Laster inn pakker for heteroskedastisitetstest
+library(lmtest)
+library(sandwich)
+
+# Breusch–Pagan-test for lineær, kvadratisk og kubisk modell
+bp_lin   <- bptest(mod_lin)
+bp_quad  <- bptest(mod_quad)
+bp_cubic <- bptest(mod_cubic)
+
+bp_lin
+bp_quad
+bp_cubic
+```
+
+```{r}
+# Samler Breusch–Pagan-resultater i en liten tabell
+het_tests <- tibble::tibble(
+  modell  = c("Lineær", "Kvadratisk", "Kubisk"),
+  BP_stat = c(bp_lin$statistic,  bp_quad$statistic,  bp_cubic$statistic),
+  df      = c(bp_lin$parameter,  bp_quad$parameter,  bp_cubic$parameter),
+  p_value = c(bp_lin$p.value,    bp_quad$p.value,    bp_cubic$p.value)
+)
+
+het_tests  # Tabell Katinca kan bruke i teksten
+
+```
+
+
+## Kausalitetsdrøfting
+
+TEKST AV KATINCA: 200–400 ord om kausal tolkning, mulige problemer (omvendt kausalitet, utelatte variabler, målefeil), og hva man kunne gjort i videre forskning.
+
+
+
+# Del D: Panelestimat
+
+## Panelestimeringsoppgave
+TEKST AV KATINCA: Kort intro om at vi bruker hele panelet (alle år og regioner)
+for å estimere effekten av regional utvikling (dev_log) på ulikhet (gini_w)
+med faste effekter for land, år og NUTS2-regioner.
+
+```{r}
+#Laster inn pakke for paneldata
+library(plm)
+```
+
+```{r}
+# Lager paneldatasett med variablene vi trenger
+panel_data <- gini_nuts2_year %>%
+  # slår inn utviklingsvariabelen dev_log fra dev_2000_2017
+  dplyr::left_join(
+    dev_2000_2017 %>%
+      dplyr::select(NUTS2, dev_log),   # bare NUTS2 og dev_log her
+    by = "NUTS2"                       # join KUN på NUTS2
+  ) %>%
+  # tar bare med de variablene vi trenger videre
+  dplyr::select(country, NUTS2, year, gini_w, dev_log)
+
+dplyr::glimpse(panel_data)
+
+```
+```{r}
+# Definerer panel-struktur
+
+# Panel 1: NUTS2 × år (region-år-panel)
+panel_p_nuts2 <- plm::pdata.frame(
+  panel_data,
+  index = c("NUTS2", "year")
+)
+
+# Panel 2: land × år (land-år-panel)
+panel_p_country <- plm::pdata.frame(
+  panel_data,
+  index = c("country", "year")
+)
+
+# Sjekk at alt ser greit ut
+dplyr::glimpse(panel_p_nuts2)
+
+```
+
+
+```{r}
+# Estimerer panelmodeller med faste effekter via dummier (lm)
+
+# Modell 1: Land-faste effekter (country-FE)
+mod_fe_country <- lm(
+  gini_w ~ dev_log + factor(country),
+  data = panel_data
+)
+
+# Modell 2: Års-faste effekter (year-FE)
+mod_fe_year <- lm(
+  gini_w ~ dev_log + factor(year),
+  data = panel_data
+)
+
+# Modell 3: NUTS2-faste effekter (region-FE)
+mod_fe_nuts2 <- lm(
+  gini_w ~ dev_log + factor(NUTS2),
+  data = panel_data
+)
+
+# Modell 4: NUTS2- og år-faste effekter samtidig
+mod_fe_nuts2_year <- lm(
+  gini_w ~ dev_log + factor(NUTS2) + factor(year),
+  data = panel_data
+)
+
+# Viser resultatene (Katinca bruker dette i teksten)
+summary(mod_fe_country)
+summary(mod_fe_year)
+summary(mod_fe_nuts2)
+summary(mod_fe_nuts2_year)
+
+```
+
+
+## Sammenlikningstabell (presentasjon av resultatene)
+
+
+```{r}
+# Samler nøkkeltall fra panelmodellene i en tabell
+panel_comp <- tibble::tibble(
+  modell    = c("Land-FE", "År-FE", "NUTS2-FE", "NUTS2+år-FE"),
+  beta_dev  = c(
+    coef(mod_fe_country)["dev_log"],
+    coef(mod_fe_year)["dev_log"],
+    coef(mod_fe_nuts2)["dev_log"],
+    coef(mod_fe_nuts2_year)["dev_log"]
+  ),
+  se_dev    = c(
+    summary(mod_fe_country)$coef["dev_log", "Std. Error"],
+    summary(mod_fe_year)$coef["dev_log", "Std. Error"],
+    summary(mod_fe_nuts2)$coef["dev_log", "Std. Error"],
+    summary(mod_fe_nuts2_year)$coef["dev_log", "Std. Error"]
+  ),
+  p_dev     = c(
+    summary(mod_fe_country)$coef["dev_log", "Pr(>|t|)"],
+    summary(mod_fe_year)$coef["dev_log", "Pr(>|t|)"],
+    summary(mod_fe_nuts2)$coef["dev_log", "Pr(>|t|)"],
+    summary(mod_fe_nuts2_year)$coef["dev_log", "Pr(>|t|)"]
+  ),
+  R2        = c(
+    summary(mod_fe_country)$r.squared,
+    summary(mod_fe_year)$r.squared,
+    summary(mod_fe_nuts2)$r.squared,
+    summary(mod_fe_nuts2_year)$r.squared
+  ),
+  adj_R2    = c(
+    summary(mod_fe_country)$adj.r.squared,
+    summary(mod_fe_year)$adj.r.squared,
+    summary(mod_fe_nuts2)$adj.r.squared,
+    summary(mod_fe_nuts2_year)$adj.r.squared
+  )
+)
+
+panel_comp
+
+```
+
+
+
+TEKST AV KATINCA: 200-400 ord. Hvordan dev_log endrer seg på tvers av modellene
+hva tegnet og størrelsen på koeffisienten betyr
+hvilken spesifikasjon (f.eks. NUTS2+år-FE) som virker mest troverdig og hvorfor.
+
+
+
+
+
+
+
+# Del E: Kildebruk
+
+## Kilder
+
+
+## Bruk av KI-verktøy (I tråd med HVL sin bruk av KI)
+
+
+
+
+
+
+
+
+
+
+
+
+
