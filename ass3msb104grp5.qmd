@@ -119,13 +119,20 @@ ggplot(data_A, aes(x = dev_log, y = gini_w, colour = edu_group3)) +
 
 ## Drøfting av delutvalgsanalyse 
 
+For å undersøke om sammenhengen mellom økonomisk utvikling og ulikhet varierer med utdanningsnivå, deler vi regionene inn i tre like store grupper basert på andel med høyere utdanning (low, mid, high edu). Hver gruppe inneholder sju regioner. Vi estimerer deretter en enkel regresjon mellom utvikling (dev_log) og ulikhet (gini_w) innen hver gruppe.
+
+I gruppen med lavt utdanningsnivå er helningen svakt negativ, og p-verdien er høy (omtrent 0,55). Det betyr at vi ikke finner noen robust statistisk sammenheng mellom utvikling og ulikhet i denne gruppen. For "mid edu" er helningen positiv og større i størrelse, men fortsatt ikke signifikant på vanlige nivåer. I high edu-gruppen er helningen positiv og signifikant på 5-prosentnivå. Dette tyder på at i regioner med høy andel høyere utdanning henger høyere økonomisk utvikling sammen med høyere ulikhet, mens bildet er svakere eller fraværende i de to andre gruppene.
+
+Samtidig er utvalget lite (kun sju observasjoner per gruppe), noe som gir brede konfidensintervall og usikre anslag. En formell likhetstest mellom modell uten og med interaksjonsledd (dev_log*edu_group3) gir en p-verdi rundt 0,23 slik at vi ikke kan avvise hypotesen om felles helning på tvers av grupper. Delutvalgsanalysen bør derfor tolkes som indikasjoner på mulig heterogenitet, ikke som sterke kausale bevis. Den illustrerer likevel hvordan delutvalg kan brukes til å utforske om en samlet sammenheng drives av bestemte undergrupper.
+
 
 
 # Del B: Utforskning av alternative funksjonelle former
 
 ## Funksjonell form-utforskning
 
-TEKST AV KATINCA: Kort tekst om hvorfor vi prøver kvadratisk/kubisk i stedet for bare lineær.
+Vi tester kvadratiske og kubiske modeller for å undersøke om forholdet mellom utvikling og ulikhet kan være ikke-linært. Økonomisk teori, som Kuznets-hypotesen, tilsier at ulikhet kan øke i tidlige utviklingsfaser og deretter avta (Kuznets, 1955). En lineær modell kan ikke fange slike bøyde sammenhenger. Ved å inkludere høyere ordens ledd gir vi modellen fleksibilitet til å avdekke mer komplekse mønstre i dataene.
+
 
 ```{r}
 # Lager et rent datasett for del B med bare variablene vi trenger
@@ -185,8 +192,10 @@ model_comp
 
 ```
 
-## Estemering og visualisering 
-TEKST AV KATINCA: Skriv her om figur + hvordan kurvene ser ut, og hva de betyr
+## Estimering og visualisering 
+
+Figuren viser datapunktene sammen med tre prediksjonskurver: lineær, kvadratisk og kubisk modell. Den lineære kurven viser en jevn, positiv trend mellom utvikling og ulikhet. Den kubiske kurven følger datapunktene tettere, særlig i ytterkantene, og indikerer svake ikke-lineære trekk. Likevel er forskjellen i kurvene moderat og hovedinntrykket er en svak positiv sammenheng. Dette gir ingen sterk støtte for en typisk Kuznets-form i dette datasettet. 
+
 
 
 ```{r}
@@ -236,7 +245,14 @@ ggplot(data_B, aes(x = dev_log, y = gini_w)) +
 
 ## Tolkning av resultater
 
-TEKST AV KATINCA: Her skrives 200–400 ord om koeffisienter, implikasjoner, hvilket funksjonsvalg som passer best, og sammenligning med den opprinnelige lineære modellen. Hvilken funksjonell form som passer best (bruk tabellen model_comp + figuren), sammenligning med den lineære modellen.
+Den lineære modellen mellom utvikling (dev_log) og ulikhet (gini_w) gir en positiv helning på om lag 0,086, som er signifikant på 5-prosentnivå. Dette betyr at regioner med høyere økonomisk utvikling i gjennomsnitt har høyere inntektsulikhet. Forklaringskraften er moderat (R² ≈ 0,22), men modellen gir et enkelt og tolkningsvennlig bilde.
+
+Når vi går over til en kvadratisk modell, øker R² svakt til 0,24, men verken dev_log eller dev_log² er signifikante enkeltvis, og F-testen for modellen som helhet er kun marginalt signifikant på rundt 10-prosentnivå. Det tyder på at dataene ikke gir tydelig støtte til en klassisk Kuznets-kurve med et klart toppunkt der ulikheten først øker og deretter faller.
+
+Den kubiske modellen gir høyest forklaringskraft (R² ≈ 0,37) og lavest AIC, og er dermed den modellen som best fanger variasjonen i gini_w gitt dette datasettet. Samlet F-test er signifikant, men de enkelte koeffisientene er kun svakt signifikante, og prøven er liten. Den kubiske kurven følger datapunktene noe tettere enn den lineære, særlig i ytterkantene og antyder svak ikke-linearitet, men forskjellen i predikert forløp er begrenset.
+
+Sammenlignet med den opprinnelige lineære modellen endrer de alternative funksjonelle formene derfor ikke hovedbudskapet. Vi finner en svak positiv sammenheng mellom regional utvikling og ulikhet, uten klar evidens for en sterk bøyet Kuznets-relasjon. Den kubiske modellen beskriver dataene best etter tradisjonelle mål (R² og AIC), men gitt få observasjoner og usikre koeffisienter legger vi mest vekt på tolkning som en robust, en relativt svak, positiv sammenheng. 
+
 
 
 
@@ -244,7 +260,8 @@ TEKST AV KATINCA: Her skrives 200–400 ord om koeffisienter, implikasjoner, hvi
 
 ## Heteroskedastisitetstesting 
 
-TEKST AV KATINCA: Kort forklaring på hva heteroskedastisitet er og hvorfor vi tester for det.
+Heteroskedastisitet betyr at variansen i feilleddet (residualene) ikke er konstant. Dette kan gjøre standardfeil upålitelige og føre til feil signifikansvurderinger (Wooldridge, 2020, kap.8). Breusch-Pagan-testen viser ingen signifikant heteroskedastisitet i våre modeller, noe som betyr at standardfeilene anses som pålitelige og kan brukes til inferens. 
+
 
 
 ```{r}
@@ -278,16 +295,30 @@ het_tests  # Tabell Katinca kan bruke i teksten
 
 ## Kausalitetsdrøfting
 
-TEKST AV KATINCA: 200–400 ord om kausal tolkning, mulige problemer (omvendt kausalitet, utelatte variabler, målefeil), og hva man kunne gjort i videre forskning.
+Selv om utvikling og ulikhet korrelerer i dataene våre, kan vi ikke uten videre tolke dette som en kausal effekt. Et første viktig problem er omvendt kausalitet. Ulikhet kan påvirke hvor godt en region utvikler seg, for eksempel gjennom investeringsinsentiver, arbeidskraftmobilitet eller politisk stabilitet. Dersom dette er tilfellet, vil regresjonen feilaktig tolke ulikhetsendringer som effekt av utvikling.
+
+En annen sentral utfordring er utelatte variabler. Regionale forskjeller i arbeidsmarkedsstruktur, institusjoner, demografi, industriell spesialisering og velferdspolitikk kan påvirke både utvikling og ulikhet samtidig. Dersom slike faktorer ikke kontrolleres for, blir estimatet på dev_log skjevt. 
+
+Målfeil kan også spille inn. BNP per innbygger på regionalt nivå er usikkert anslått, og ulikhetsmål som Gini kan være påvirket av underrapportering av inntekter i enkelte land. Slike feil kan føre til at sammenhengen undervurderes. 
+
+Videre forskning kan styrke kausaliteten ved å:
+- Bruke instrumentvariabler som gir eksogen variasjon i utvikling
+- Inkludere flere tidsvarierende kontrollvariabler
+- Undersøke tidsforsinkede effekter (laggede analyser)
+- Utnytte politiske endringer eller EU-støtteprogram som naturlige eksperimenter 
+
+Vår analyse gir derfor et deskriptivt bilde av sammenhengen, men uten solid grunnlag for en årsaksslutning uten videre metodiske forbedringer.
+
 
 
 
 # Del D: Panelestimat
 
 ## Panelestimeringsoppgave
-TEKST AV KATINCA: Kort intro om at vi bruker hele panelet (alle år og regioner)
-for å estimere effekten av regional utvikling (dev_log) på ulikhet (gini_w)
-med faste effekter for land, år og NUTS2-regioner.
+
+Vi bruker paneldata med alle regioner og år for å undersøke effekten av utvikling på ulikhet. Ved å inkludere faste effekter for land, region og år kontrollerer vi for konstante forskjeller mellom regioner (som historisk institusjonskvalitet), samt felles sjokk for alle regioner i samme år (f.eks. finanskrise). Dette gjør at vi estimerer effekten basert på innen-regions endringer over tid, noe som gir en mer troverdig analyse enn ren tverrsnitts sammenligning. 
+
+
 
 ```{r}
 #Laster inn pakke for paneldata
@@ -408,15 +439,16 @@ panel_comp <- tibble::tibble(
 panel_comp
 
 ```
+Resultatene fra panelmodellen viser store forskjeller i koeffisienten for dev_log avhengig av hvilke faste effekter som inkluderes. Når vi kun kontrollerer for felles utvikling over tid (år-faste effekter), er sammenhengen positiv og signifikant. Dette speiler en forenklet observasjon: regioner med høy utvikling har ofte høyere ulikhet.
 
+Når vi derimot legger inn faste effekter for regioner, snur resultatene: sammenhengen blir sterk og signifikant negativ. Det innebærer at når samme region øker sitt utviklingsnivå over tid, så går ulikheten ned. Effekten blir i tillegg mer stabil og presis når både år- og regionspesifikke faste effekter inkluderes.
 
+Den mest troverdige spesifikasjonen er derfor modellen med NUTS-2 og år-faste effekter. Denne kontrollerer for:
+- Tid-invariante regionale særtrekk
+- Felles europeiske utviklingstrekk hvert år
+- Forskjeller i landspolitiske systemer
 
-TEKST AV KATINCA: 200-400 ord. Hvordan dev_log endrer seg på tvers av modellene
-hva tegnet og størrelsen på koeffisienten betyr
-hvilken spesifikasjon (f.eks. NUTS2+år-FE) som virker mest troverdig og hvorfor.
-
-
-
+Konklusjonen blir dermed at uten faste effekter risikerer man å trekke motsatt konklusjon. Det understreker betydningen av paneldata og robust modellspesifikasjon når målet er å isolere reell effekt av økonomisk utvikling. 
 
 
 
@@ -425,10 +457,20 @@ hvilken spesifikasjon (f.eks. NUTS2+år-FE) som virker mest troverdig og hvorfor
 
 ## Kilder
 
+Wooldridge, J. M. (2020). Introductory econometrics: A modern approach (7th ed.). Cengage.
+
+Kuznets, S. (1955). Economic growth and income inequality. The American Economic Review, 45(1), 1–28
 
 ## Bruk av KI-verktøy (I tråd med HVL sin bruk av KI)
 
+I arbeidet med denne oppgaven har vi brukt KI-verktøy i begrenset omfang og kun som teknisk støtte. Konkret har vi brukt ChatGPT (OpenAI GPT-5.1) gjennom nettleser for å forstå og løse feilmeldinger i R-kode.
 
+Typiske bruksområder var:
+- Å kopiere inn feilmeldinger fra R og be om forklaring på hva de betyr
+- Å få forslag til små justeringer i kode (for eksempel manglende parenteser, feil i objektnavn eller problemer med nedlastning av pakker).
+- Å be om hjelp til å tolke output fra feilmeldingsvinduet når R ikke vil kjøre en chunk.
+
+Denne bruken er etter vår vurdering i tråd med HVL sine retningslinjer for KI, der verktøyet har blitt brukt som støtte for tekniske og praktiske problemer. 
 
 
 

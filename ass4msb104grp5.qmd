@@ -1,0 +1,69 @@
+---
+title: "Regional Development and Inequality in [dine land]"
+author: ["Frida A. Alendal", "Gruppemedlemmer"]
+format:
+  pdf:
+    papersize: a4
+    fontsize: 11pt
+lang: "nb"
+csl: "apa7.csl"
+
+---
+
+# Sammendrag
+
+# Introduksjon
+
+I løpet av de siste tiårene har regional økonomisk utvikling og geografiske forskjeller i inntekt fått økt oppmerskomhet i europeisk politikk. EU sin samholdspolitikk bygger på en antakelse om at sterke regionale ulikheter kan undergrave både økonomisk effektivitet og sosial stabilitet. Samtidig viser nyere forskning at sammenhengen mellom økonomisk vekst og regional ulikhet ikke er entydig. Noen land opplever konvergens mellom regioner over tid, mens andre ser økende polarisering mellom sterke vekstsentra og mer sårbare områder. Dette reiser spørsmål om hvordan utviklingsbaner og institusjonelle forhold spiller sammen med regionale fordelingsmønstre.
+
+Vi har undersøkt regional utvilking og ulikhet i fem europeiske land: Østerrike (AT), Tsjekkia (CZ), Estland (EE), Spania (ES) og Slovenia (SI). Vi har tatt utgangspunkt i et sett med harmoniserte Eurostat-data på NUTS-3-nivå for perioden 2000-2023, der vi kombinerer regionalt BNP med befolkning per 1. januar for å beregne BNP per innbygger (GDPC). På grunnlag av dette konstruerer vi befolkningsvektede mål for regional ulikhet på NUTS-2 ved hjelp av Gini-koeffisienten. Vi så dermed både på nivå og spredning i regionalt inntektsnivå, og på hvordan interne forskjeller innen regioner utvikler seg over tid.
+
+Analysen bygger videre på tre tidligere delarbeider. Først kartla vi nivå og fordeling av BNP per innbygger på NUTS-3 for de fem landene, med vekt på tidsutvikling i landsgjennomsnitt, spredning mellom regioner og særtrekk ved utvalgte land. Deretter koblet vi dette til et mål på regional ulikhet og estimerte tverrsnittsmodeller der Gini-koeffisienten på NUTS-2 i 2017 forklares ved regional utvikling målt som log-vekst i BNP per innbygger frem til 2017. Modellen ble så utvidet med tre regionale kjennetegn, andel med høyere utdanning, arbeidsledighetsrate og befolkningstetthet, for å undersøke om disse faktorene kan bidra til å forklare variasjon u ulikhet utover rene utviklingsforskjeller
+
+I den tredje delev av arbeidet gikk vi dypere inn i modelleringen av sammenhengenn mellom utvikling og ulikhet. Vi testet om effekten av regional utvikling varierer mellom undergrupper definert ved utdanningsnivå, og utforsket alternative funksjonelle former (lineær, kvadratisk, kubisk) for å fange eventuelle ikke-linære sammenhenger. Videre gjennomførte vi tester for heteroskedastisitet og estimerte panelmodeller med faste effekter for land, NUTS-2-regioner. Dette gjør  det mulig å skille bedre mellom tidsvariasjon som er felles på tvers av regioner og mer varige forskjeller mellom dem. 
+
+Formålet med artikkelen er å gi et samlet bilde av hvordan regionalt inntektsnivå og intern ulikhet henger sammen i våre fem land, og hvordan resultatene avhenger av modellvalg og datanivå. Vi stiller særlig tre spørsmål:
+
+(1) Hvordan har nivå og spredning i BNP per innbygger utviklet seg på tvers av regioner siden 2000? 
+
+(2) Hvordan har regional ulikhet innen NUTS-2-regioner utviklet seg over tid?
+
+(3) Hvilken sammenheng finner vi mellom regional økonomisk utvikling og ulikhet, og hvordan påvirkes denne sammenhengen av andre regionale kjennetegn og valg av modellspesifikasjon? Resten av artikkelen er strukturert som følger: Del || gir en kort gjennomgang av relevant litteratur, del ||| beskriver data og metode, del |V presenterer de empiriske resultatene, del V diskuterer funnene i lys av teori og politikk, del V| peker på begrensninger og mulige veier for videre forskning, før vi avslutter med en konklusjon i del V||. 
+
+
+
+# Litteraturgjennomgang
+
+Regional økonomisk utvikling og geografiske forskjeller i inntekt har lenge vært sentrale tema i både makroøkonomisk og regionaløkonomisk forskning. Mange studier undersøker om regioner innen et land konvergerer mot et felles inntektsnivå over tid, eller om det snarere oppstår vedvarende eller økende forskjeller mellom sterke vekstsentra og mer perifere områder. En viktig tråd i denne litteraturen er at sammenhengen mellom utviklingsnivå og ulikhet ikke nødvendigvis er lineær, men kan følge et mønster der ulikheten først øker, deretter avtar og i noen tilfeller øker svakt igjen ved svært høye inntektsnivåer. Dette knyttes ofte til strukturelle forhold som urbanisering, teknologisk utvikling, integrasjon i verdensmarkedet og institusjonelle forskjeller mellom land og regioner. 
+
+Som hovedreferanse bygger vi på Lessmann og Seidal (2017), som analyserer regional inntektsulikhet på tvers av en stor gruppe land ved å kombinere nattlys-satellittdata  med nasjonale inntektsmål. De predikerer regional inntekt fra lysintensitet, korrigerer for målefeil som top-coding og nullobservasjoner, og bruker de predikerte inntektene til å beregne standard mål på ulikhet som befolkningsvektet Gini og generaliserte entropimål. En viktig begrunnelse i artikkelen er at befolkningsvekting er nødvendig når regioner har svært ulik størrelse. Uten vekting vil små regioner telle like mye som store, og ulikhetsmålene sier da mindre om fordelingen mellom mennesker enn om fordelingen mellom geografiske enheter (@lessmann_seidel_2017).
+
+Resultatene til Lessmann og Seidel viser for det første at rundt to tredeler av landene i utvalget deres opplever sigma-konvergens, det vil si fallende spredning i 
+
+
+
+# Data og metode
+
+# Empiriske funn
+
+# Diskusjon
+
+# Begrensninger og videre forskning
+
+# Konklusjon
+
+# Referanser
+
+# Appendiks: Bruk av KI-verktøy
+
+
+
+
+
+
+
+
+
+
+
+
